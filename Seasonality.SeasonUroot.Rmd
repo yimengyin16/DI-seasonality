@@ -1,0 +1,446 @@
+---
+title: "Seasonal Model"
+output:
+  pdf_document:
+    includes:
+      in_header: LatexPreamble.sty
+    number_sections: yes
+---
+
+```{r, echo=FALSE, include=FALSE}
+
+library(uroot)
+library(forecast)
+library(dynlm)
+library(xtable)
+
+options(xtable.include.rownames = F,
+        xtable.booktabs = T,
+        xtable.caption.placement = "top")
+
+
+source("General.R")
+source("Forecasting.main.R")
+
+load("Panel.RData")
+
+```
+
+```{r defining_series, echo=FALSE,include=FALSE}
+
+lvarName = "lTotal"
+dlvarName = "dlTotal"
+stateName = "NW"
+
+# log 
+lTotal      = window(select("lTotal", stateName, Panel), s = c(2000,10))
+lTitle.2    = window(select("lTitle.2", stateName, Panel), s = c(2000,10))
+lTitle.16   = window(select("lTitle.16", stateName, Panel), s = c(2000,10))
+lConcurrent = window(select("lConcurrent", stateName, Panel), s = c(2000,10))
+
+lunempU = window(select("lunemply_U", stateName, Panel), s = c(2000,11))
+lunempS = window(select("lunemply_S", stateName, Panel), s = c(2000,11)) 
+Month = as.factor(Panel$Month[Panel$State == "A8"])
+
+# first differenced log 
+dlTotal      = window(select("dlTotal", stateName, Panel), s = c(2000,11))
+dlTitle.2    = window(select("dlTitle.2", stateName, Panel), s = c(2000,11))
+dlTitle.16   = window(select("dlTitle.16", stateName, Panel), s = c(2000,11))
+dlConcurrent = window(select("dlConcurrent", stateName, Panel), s = c(2000,11))
+
+dlunempU = window(select("dlunemply_U", stateName, Panel), s = c(2000,11))
+dlunempS = window(select("dlunemply_S", stateName, Panel), s = c(2000,11))
+dMonth = Month[-1] 
+
+# first differenced log, net of seasonal dummies
+AdlTotal     = ts(lm(dlTotal ~ dMonth -1)$res, s = c(2000,11), f = 12)
+AdlTitle.2   = ts(lm(dlTitle.2 ~ dMonth -1)$res, s = c(2000,11), f = 12)
+AdlTitle.16  = ts(lm(dlTitle.16 ~ dMonth -1)$res, s = c(2000,11), f = 12)
+AdlConcurrent= ts(lm(dlConcurrent ~ dMonth -1)$res, s = c(2000,11), f = 12)
+
+AdlunempU = ts(lm(dlunempU ~ dMonth -1)$res, s = c(2000,11), f = 12)
+
+
+# Seasonally differenced log
+DlTotal = diff(lTotal,12)
+DlunempU = diff(lunempU,12)
+DMonth = Month[-(1:12)]
+
+```
+
+
+This code is for the analysis of seasonality in the paper of "Forecasting U.S. Disability Applications" it includes
+
+# Testing for seasonal unit roots in various serious. 
+
+Espasa and Mayo (2013, pp723):
+
+* We applied the Osborn, Chui, Smith, and Birchenhall (1988) tests, hereafter OCSB, and the Hylleberg, Engle, Granger, and Yoo (1990) test, as extended by Beaulieu and Miron (1993), hereafter HEGY. Using the terminology employed in the first paper, I ( r , s ) , where r and s can take values of one or zero, means that the data need r regular differences and s annual differences in order to be stationary. Following both references, we can test whether a particular series is I(1, 1), I(1, 0), I(0, 1) or I(0, 0), and in the second and fourth cases we can test whether the seasonal dummies are significant.
+
+
+## CH test
+
+```{r, results='markup' ,tidy=TRUE}
+
+## Settings for CH.test 
+CH.f0 = 1          # Whether the 1st lag of dependent variable is included in auxiliar regression
+CH.frec = NULL      # Test for all frequencies
+# CH.frec = c(1,rep(0,5))   # only pi/6 tested
+# CH.frec = c(0,1,rep(0,4)) # only pi/3 tested
+# CH.frec = c(1,1,rep(0,4)) # only pi/6 and pi/3 tested
+
+## log differenced series, seasonal dummies not removed.
+# CH.test(select("dlTotal", "A8", data = Panel, na.rm = T), f0 = CH.f0, frec = CH.frec)
+# CH.test(select("dlTitle.2", "A8", data = Panel, na.rm = T), f0 = CH.f0, frec = CH.frec)
+# CH.test(select("dlTitle.16", "A8", data = Panel, na.rm = T), f0 = CH.f0, frec = CH.frec)
+# CH.test(select("dlConcurrent", "A8", data = Panel, na.rm = T), f0 = CH.f0, frec = CH.frec)
+# CH.test(select("dlunemply_U", "A8", data = Panel, na.rm = T), f0 = CH.f0, frec = CH.frec)
+
+
+ch.test(select("Title.2",    "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.87 
+ch.test(select("Title.16",   "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.89
+ch.test(select("Concurrent", "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.72
+ch.test(select("unemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.89
+
+
+ch.test(select("dlTitle.2",    "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.94 
+ch.test(select("dlTitle.16",   "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.89
+ch.test(select("dlConcurrent", "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.81
+ch.test(select("dlunemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 2.12
+
+
+
+rm(CH.f0, CH.frec)
+
+```
+
+Results:
+
+* When seasonal unit roots at all frequencies are tested,the $H_0$ of sationarity cannot be rejected even at 10% level for all series.
+* When only pi/6 is tested, SSI is significant at 10% level, and unemployment is almost significant at 10% level.
+* When only pi/3 is tested, DI is significant at 10% level, all others are insignificant.
+* When only pi/6 and pi/3 are tested, none is significant. 
+* All results are robust to the inclusion of a lag term in the auxiliar regression.
+* All results are the same for logged series and log differenced series. 
+ 
+
+Notes:
+
+1. Data set used: 2000:10:2014:5  
+2. The seasonal dummies are automatically romoved when using `CH.test`.
+
+
+## OCSB test
+
+Need to check the original paper OCSB(1988) to confirm the test regression. 
+
+```{r}
+## My function
+
+OCSB.TEST = function(x, lags = c(1,5), period = 12){
+  ## This function implement OCSB test for seasonal unit root based on OCSB(1988)
+  ## Critical values can be found in Franses and Hobijin (1997).(CV are not provided for all sample size, but eht Gauss code is provided.)
+  ## Inputs
+    # x: a ts object.
+    # lags: a vector containing lags of dependent variable to be included in test regression.
+  ## Outputs: A list with following components:
+    # $reg: test regression
+    # $bgtest: Bruesch-Godfrey test for autocorrelation in residuals
+    # $t: 2 t statistics for beta_1 = 0 and beta_2 = 0
+    # $F: F statistics for beta_1 = beta_2 = 0
+  
+  # x = lTota
+# period = 12
+y1s = diff(x, lag = period, differences = 1)
+y1s = diff(y1s, lag = 1, differences = 1)
+y1 = diff(x, lag = 1, differneces = 1)
+ys = diff(x, lag = period, differences = 1)
+
+Y = cbind(y1s, y1, ys, cycle = cycle(x), trend = 1:length(x))
+
+lmOCSB = dynlm(y1s ~ L(ys,1) + L(y1, period) + L(y1s, lags)+ factor(cycle), data= Y)
+bg = bgtest(lmOCSB, 12)
+
+# t statistics
+t.one = summary(lmOCSB)$coef[2,3]
+t.two = summary(lmOCSB)$coef[3,3]
+
+# F statistics
+Fstat = linearHypothesis(lmOCSB, c("L(ys, 1) = 0", "L(y1, period) = 0"))$F[2]
+
+print(bg)
+print(t.one)
+print(t.two)
+print(Fstat)
+print(paste("critical value of t:", forecast:::calcOCSBCritVal(period)))
+
+output = list(reg = lmOCSB, bgtest = bg, t = c(t.one = t.one, t.two = t.two), F = Fstat)
+}
+
+OCSB.TEST(lTotal, c(1,5))
+OCSB.TEST(lTitle.2, c(1:3))
+OCSB.TEST(lTitle.16, c(1:9))
+OCSB.TEST(lConcurrent, c(1,12:15))
+OCSB.TEST(lunempU, c(1:5))
+
+#* Critical values from Franses and Hobijin(1997):
+
+# t statistics (c, d, nt): 
+# Year|  0.01|0.025| 0.05| 0.10 | 0.01 |0.025| 0.05| 0.10 
+# ----|----------------------------------------------------
+# 10  | -5.39|-5.01|-4.68| -4.31| -3.42|-3.08|-2.78| -2.48
+# 20  | -5.40|-5.05|-4.74| -4.38| -3.40|-3.07|-2.81| -2.52
+# 
+# F statistic (c, d, nt): c, d, nt 
+# Year|  0.01 | 0.025 | 0.05  | 0.10 
+# ----|-------------------------------
+# 10  | 11.21 | 13.11 | 14.87 | 17.16
+# 20  | 11.51 | 13.26 | 14.87 | 16.91
+
+```
+
+Results
+
+* t tests for $\beta_1$ indicate regular differencesa are needed in all series.
+* t tests for $\beta_2$ indicate no seasonal difference is need in all series.
+* F tests indicate the null of I(1,1) is strongly rejected in all series. 
+
+
+## HEGY test
+
+There are two versions of monthly HEGY test, which are developed by Franses P.H.(1990) and Beaulieu and Miron (1991) respectively. 
+
+```{r HEGY_Test_using_uroot_NoTrend, results='hide', warning=FALSE}
+
+HEGY.det = c(1,0,1 ) # Deterministic components: Intercept, Seasonal dummies, No trend.
+# HEGY.lags = 12
+
+
+HEGY.Total     = hegy.test(lTotal,      deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGY.Title.2   = hegy.test(lTitle.2,    deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGY.Title.16  = hegy.test(lTitle.16,   deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGY.Concurrent= hegy.test(lConcurrent, deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGY.unemploy  = hegy.test(lunempU,     deterministic = HEGY.det) # pass bgtest(12) with lag 10
+
+
+# HEGY.Title.2  = HEGY.test(lTitle.2, itsd = HEGY.det, regvar=0, selectlags = list(mode = c(1,7,9,10), Pmax = 12)) # pass bgtest(12) with lag 7, 9,10
+# HEGY.Title.16 = HEGY.test(lTitle.16, itsd = HEGY.det, regvar=0, selectlags = HEGY.lags) # pass bgtest(12) with lag 5,10,12
+# HEGY.Concurrent = HEGY.test(lConcurrent, itsd = HEGY.det, regvar=0, selectlags = list(mode = c(1,2), Pmax = 12)) # pass bgtest(12) with lags 1,2
+# HEGY.unemploy = HEGY.test(lunempU, itsd = HEGY.det, regvar=0, selectlags = HEGY.lags) # pass bgtest(12) with lag 3,8,9 weakly
+
+HEGY.Total
+HEGY.Title.2
+HEGY.Title.16
+HEGY.Concurrent
+HEGY.unemploy
+
+# summary(HEGY.Total@lmhegy)
+# summary(HEGY.Title.2@lmhegy)
+# summary(HEGY.Title.16@lmhegy)
+# summary(HEGY.Concurrent@lmhegy)
+# summary(HEGY.unemploy@lmhegy)
+
+# bgtest(HEGY.Total@lmhegy, order = 12)
+# bgtest(HEGY.Title.2@lmhegy, order = 12)
+# bgtest(HEGY.Title.16@lmhegy, order = 12)
+# bgtest(HEGY.Concurrent@lmhegy, order = 12)
+# bgtest(HEGY.unemploy@lmhegy, order = 12)
+
+HEGY.table = rbind(HEGY.Total$statistics,
+                   HEGY.Title.2$statistics,
+                   HEGY.Title.16$statistics,
+                   HEGY.Concurrent$statistics,
+                   HEGY.unemploy$statistics
+                   )
+HEGY.table = data.frame(Category = c("Total", "SSDI","SSI","Concurrent", "Unemployment"), HEGY.table)
+HEGY.table
+
+
+
+
+
+
+
+```
+
+```{r HEGY_Test_using_uroot_WithTrend, results='hide', warning=FALSE}
+
+HEGY.det = c(1,1,1) # Deterministic components: Intercept, Seasonal dummies, No trend.
+#HEGY.lags = list(mode = "signf", Pmax = 12)
+
+# HEGYT.Total    = HEGY.test(lTotal, itsd = HEGY.det, regvar=0, selectlags = HEGY.lags) # pass bgtest(12) with lag 10
+# HEGYT.Title.2  = HEGY.test(lTitle.2, itsd = HEGY.det, regvar=0, selectlags = list(mode = c(1,7,9,10), Pmax = 12)) # pass bgtest(12) with lag 7, 9,10
+# HEGYT.Title.16 = HEGY.test(lTitle.16, itsd = HEGY.det, regvar=0, selectlags = HEGY.lags) # pass bgtest(12) with lag 5,10,12
+# HEGYT.Concurrent = HEGY.test(lConcurrent, itsd = HEGY.det, regvar=0, selectlags = list(mode = c(1,2), Pmax = 12)) # pass bgtest(12) with no lags
+# HEGYT.unemploy = HEGY.test(lunempU, itsd = HEGY.det, regvar=0, selectlags = HEGY.lags) # pass bgtest(12) with lag 3,8,9 weakly
+
+HEGYT.Total     = hegy.test(lTotal,      deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGYT.Title.2   = hegy.test(lTitle.2,    deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGYT.Title.16  = hegy.test(lTitle.16,   deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGYT.Concurrent= hegy.test(lConcurrent, deterministic = HEGY.det) # pass bgtest(12) with lag 10
+HEGYT.unemploy  = hegy.test(lunempU,     deterministic = HEGY.det) # pass bgtest(12) with lag 10
+
+
+
+HEGYT.Total
+HEGYT.Title.2
+HEGYT.Title.16
+HEGYT.Concurrent
+HEGYT.unemploy
+
+# summary(HEGYT.Total@lmhegy)
+# summary(HEGYT.Title.2@lmhegy)
+# summary(HEGYT.Title.16@lmhegy)
+# summary(HEGYT.Concurrent@lmhegy)
+# summary(HEGYT.unemploy@lmhegy)
+# 
+# bgtest(HEGYT.Total@lmhegy, order = 12) # pass with lag 12
+# bgtest(HEGYT.Title.2@lmhegy, order = 12) # pass with 1,7,9,10
+# bgtest(HEGYT.Title.16@lmhegy, order = 12) # pass with 5,10,12
+# bgtest(HEGYT.Concurrent@lmhegy, order = 12) # pass with 1,2
+# bgtest(HEGYT.unemploy@lmhegy, order = 12) # pass with 3,8,9 weakly
+
+
+HEGYT.table = rbind(HEGYT.Total$statistics,
+                   HEGYT.Title.2$statistics,
+                   HEGYT.Title.16$statistics,
+                   HEGYT.Concurrent$statistics,
+                   HEGYT.unemploy$statistics
+                   )
+
+HEGYT.table = data.frame(Category = c("Total", "SSDI","SSI","Concurrent", "Unemployment"), HEGYT.table)
+HEGYT.table
+
+
+
+
+```
+
+
+```{r Tables_of_HEGY_test}
+
+options(digits = 3)
+
+print(xtable(HEGY.table))
+print(xtable(HEGYT.table))
+
+```
+
+
+
+
+```{r HEGY_test_lag_selection, include=FALSE}
+library(dynlm)
+library(stargazer)
+library(lmtest)
+
+## This prgram implement Monthly HEGY test exst extended by BM. 
+
+HEGY.reg = function(x, Lags){
+#x = lunempU
+
+y1 = filter(x, rep(1,12), "convolution", side = 1)
+y2 = filter(x, -c(1, -1, 1,-1, 1,-1, 1, -1, 1,-1, 1, -1), "convolution", side = 1)
+y3 = filter(x, -c(0,  1, 0,-1, 0, 1, 0, -1, 0, 1, 0, -1), "convolution", side = 1)
+y4 = filter(x, -c(1,  0,-1, 0, 1, 0,-1,  0, 1, 0,-1,  0), "convolution", side = 1)
+y5 = filter(x, -0.5*c(1, 1,-2, 1, 1, -2, 1, 1, -2, 1,1, -2), "convolution", side = 1)
+y6 = filter(x, (sqrt(3)/2)*c(1, -1, 0, 1, -1, 0, 1, -1, 0, 1,-1, 0), "convolution", side = 1)
+y7 = filter(x, 0.5*c(1, -1, -2, -1, 1, 2, 1, -1, -2, -1, 1, 2), "convolution", side = 1)
+y8 = filter(x, -(sqrt(3)/2)*c(1, 1, 0, -1, -1, 0, 1, 1, 0, -1,-1, 0), "convolution", side = 1)
+
+y9 = filter(x, -(1/2)*c(sqrt(3), -1, 0, 1, -sqrt(3), 2, -sqrt(3), 1, 0, -1,sqrt(3), -2), "convolution", side = 1)
+
+y10 = filter(x, (1/2)*c(1, -sqrt(3), 2, -sqrt(3), 1, 0, -1, sqrt(3), -2, sqrt(3),-1, 0), "convolution", side = 1)
+
+y11 = filter(x, (1/2)*c(sqrt(3), 1, 0, -1, -sqrt(3), -2, -sqrt(3), -1, 0, 1,sqrt(3), 2), "convolution", side = 1)
+
+y12 = filter(x, -(1/2)*c(1, sqrt(3), 2, sqrt(3), 1, 0, -1, -sqrt(3), -2, -sqrt(3),-1, 0), "convolution", side = 1)
+
+y13 = diff(x,12)
+
+Y = cbind(x, y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12, y13, month = cycle(x), index = 1:length(x), con = 1)
+
+lmHEGY = dynlm(y13 ~  L(y1) + L(y2) + L(y3) + L(y4) + L(y5) + L(y6) + L(y7) + L(y8) + 
+                           L(y9) + L(y10) + L(y11) + L(y12) + factor(month) + L(y13, c(Lags)), 
+                           data = Y)
+return(lmHEGY)
+}
+
+HEGY.stats = function(lmHEGY){
+
+Stats = c(
+F3_4 = linearHypothesis(lmHEGY, c("L(y3) =0", "L(y4) = 0"))$F[2],
+F5_6 = linearHypothesis(lmHEGY, c("L(y5) =0", "L(y6) = 0"))$F[2],
+F7_8 = linearHypothesis(lmHEGY, c("L(y7) =0", "L(y8) = 0"))$F[2],
+F9_10= linearHypothesis(lmHEGY, c("L(y9) =0", "L(y10) = 0"))$F[2],
+F11_12 = linearHypothesis(lmHEGY, c("L(y11) =0", "L(y12) = 0"))$F[2],
+
+F2_12 = linearHypothesis(lmHEGY, c("L(y2) = 0","L(y3) =0", "L(y4) = 0",
+                           "L(y5) =0", "L(y6) = 0","L(y7) =0", "L(y8) = 0",
+                           "L(y9) =0", "L(y10) = 0","L(y11) =0", "L(y12) = 0"))$F[2],
+
+F1_12 = linearHypothesis(lmHEGY, c("L(y1) =0", "L(y2) = 0","L(y3) =0", "L(y4) = 0",
+                           "L(y5) =0", "L(y6) = 0","L(y7) =0", "L(y8) = 0",
+                           "L(y9) =0", "L(y10) = 0","L(y11) =0", "L(y12) = 0"))$F[2])
+return(as.matrix(Stats))
+}
+
+lmHEGY = HEGY.reg(lTitle.2, c(1,7,9,10))
+
+bgtest(lmHEGY, order = 12)
+tsDiag(residuals(lmHEGY))
+
+summary(lmHEGY)
+stargazer(lmHEGY, type = "text")
+HEGY.stats(lmHEGY)
+
+```
+
+New results form updated data. 
+
+* Lags in the auxiliary regression are selected to make the residuals pass the bptest for autocorrelation up to order 12. First, apply automatic selection, where 1 to 12 lags are included and then drop the lags insignificant at 10% level. The selected lags are used if the residuals can pass bptest. Second, if the residuals from the auto selection procedure fail to pass bptest, then loose the selection criteria to significance at 15%. Repeat until the residuals pass bptest.  
+
+* Results for the national level series. 
+    + lTotal: none. 
+    + lTitle.2: t2.
+    + lTitle.16: t2, F11:12
+    + lConcurrent: none
+    + lunempU: none
+ 
+* 3/4: 4month cycle; 9/10: 2.4month lag(5 cycles per year, very weird)
+* The results are very different when trend is included in the test regression.
+
+## Summary 
+
+* All series are I(1,0) when deterministic seasonality is removed. Therefore only regular differences are needed to make the series stationary. 
+* Since there is no seasonal unit root in unemployment series, the possibility of seasonal cointegration between unemployment and disability applications can therefore be exluded. Is it sufficient to conclude that the change in seasonal component in unemployment provide little information to the change in seasonal pattern in disability applications? 
+
+
+
+
+
+# Testing for unit Roots
+
+* ADF test
+* KPSS test
+* Andrew Zivot(1992) test, which allows for structural break.
+    + Zivot E. and Anders D. W. K. (1992) Futher Evidence on the Greate Crash, the Oil Price Shocks, and the Unit Root Hypothesis // Journal of Business and Economic Statistics. Vol. 10 pp. 251-270 
+    + Perron P. P.(1989) The Greate Crash, the Oil Price Shock and the Unit Root Hypophesis // Econometrica Vol. 57. pp. 1361-1402. 
+    + Perron P. P.(1997) Futher Evidence on Breaking Trends Functions in Macroeconomics // Journal of Econometrics Vol. 80 pp. 355-385. 
+
+
+# Testing for Non-Linearity
+
+
+To do
+* Seasonal dummies for each state each type and unemployment, boxplots
+* Test for heterogeneity across states and types. Pesaran and Yamagata(2008) Test. 
+* Coherence plots. 
+* plot series
+
+
+
+
+
+
+
