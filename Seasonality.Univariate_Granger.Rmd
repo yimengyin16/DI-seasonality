@@ -1,0 +1,660 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+# Description
+  In this section we test for the granger non-causality between the disability applicaiton and unemployment. The aim of this analysis is to investigage the relationship between the stochastic seasonal components of disability applications and unemployment. 
+  
+  The stochastic seasonal components can be obtained through two approaches. First, the deterministic seasonality can be eliminated by taking seasonal(12th) difference. Theoretically, the any possible long-term stochastic trend, i.e. unit root, will be differenced away as well, since (1 - L) is included as a factor in the seasonal difference filter (1 - L^12). Therefore the resulting series is expected to be stationary and free of seasonality. Second, we can first take out the unit root by first differencing, and the stochastic seasonality can be then obtained as the residuals from the regression with seasonal dummies. 
+  
+  The Granger-causality test will be carried out for DI, SSI and concurrent application series at national level and in 10 states with high application volume. Hence there are a total of 3 x 11 = 33 tests. 
+  
+  When testing the granger causality using national level series, we found that the total application becomes stationary after seasonal difference while unemployment does not. The regular granger-causality test method is not valid when the series under examination are not all stationay. Two approaches are employed to tackle this problem. First, (1 - L)(1 - L^12) operator is applied to applcation and unemployment series before implementing the regular granger causality test procedure. While the double difference filter make both series stationary, test results may be subject to potential problems(what problem?) caused by over differencing the applcation series, which is already stationary after annual difference. Anohter solution is to employ the granger-causality test technique developed by Toda-Yamamoto(1995), which is applicable to series with arbitrary order of unit root. Although the original Toda-Yamamoto test is designed for level series with unknown order of non-stationarity and cointegration relationship, the method is applied to the the seasonally differenced application and unemployment series.(Need to briefly justify the applicability, even informally in a footnote)
+
+The granger-causality tests are planned as below. 
+1. Data preparation
+  - series to be used(all in log): Total, SSDI, SSI, Concurrent applications and unadjusted unemployment
+  - For each series, following transformations will be obtained: 
+      - 1st diff
+      - 12th diff
+      - 1st and 12th diff
+      - 1st diff net of seasonal dummies.
+2. Test for stationarity
+3. Regression analysis
+4. Granger-Causality test. 
+    - 12th differenced-regular
+    - 1st and 12th differenced - regular
+    - 12th differenced-TY
+    - 1st differenced and net of seasonal dummies - regular
+
+
+```{r preamble, echo=FALSE, include=FALSE}
+
+library(plyr)
+library(ggplot2)
+library(scales)
+library(xtable)
+library(DataCombine)
+library(magrittr)
+# library(strucchange)
+library(urca)
+library(vars)
+library(aod) # for wald.test()
+library(zoo)
+library(tseries)
+library(magrittr)
+library("tidyr")
+library("knitr")
+
+options(xtable.include.rownames = F,
+        xtable.booktabs = T,
+        xtable.caption.placement = "top")
+
+
+source("General.R")
+# source("Forecasting.main.R")
+
+load("Data/Panel.RData")
+
+plot.path = "paper_plot/Granger"
+
+monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+
+Panel <- 
+  Panel %>% 
+  mutate(date_yearmon =  as.yearmon(Formatted.Date))
+
+
+Panel_all <- Panel
+Panel <- filter(Panel,date_yearmon <= "2020-2")
+
+end_Panel <- c(2020, 2)
+
+```
+
+
+```{r data_prep}
+
+#obtain the stochastic seasonality component using the residuals 
+  # from the seasonal dummy regression applied to the first difference series. 
+
+# First take the seasonal(12th) differnece of the growth rates(log difference) of application and unemployment.
+# Then regress the seasonal differenced growth of application on that of unemployment. 
+
+## Issues in the seasonal differences of the log level series.
+ # Application series are stationary but unemployment is not.
+ # But plots of the seasonal differenced log levels reveal there may be common trend in application and unemployment.
+ # Seasonal difference of growth is stationary for all series. 
+ # Potential problem: What's the consequence of over difference in the application seires?
+
+## To do:
+ # run panel data analysis. 
+
+# c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
+
+create_Data <- function(state){
+ # input
+  # state: string of state/region name
+
+ # output: mts object containing seasonally differenced, seasonally and firsted differenced data(with "d")
+
+#state <- "AG"
+  
+dlTotal     = diff(ts(Panel[Panel$State == state, "lTotal"], s = c(2000, 10), f = 12), 1)
+dlTitle.2   = diff(ts(Panel[Panel$State == state, "lTitle.2"], s = c(2000, 10), f = 12), 1)
+dlTitle.16  = diff(ts(Panel[Panel$State == state, "lTitle.16"], s = c(2000, 10), f = 12), 1)
+dlConcurrent= diff(ts(Panel[Panel$State == state, "lConcurrent"], s = c(2000, 10), f = 12), 1)
+dlunempU    = diff(ts(Panel[Panel$State == state, "lunemply_U"], s = c(2000, 10), f = 12), 1)
+  
+sdlTotal     = diff(ts(Panel[Panel$State == state, "lTotal"], s = c(2000, 10), f = 12), 12)
+sdlTitle.2   = diff(ts(Panel[Panel$State == state, "lTitle.2"], s = c(2000, 10), f = 12), 12)
+sdlTitle.16  = diff(ts(Panel[Panel$State == state, "lTitle.16"], s = c(2000, 10), f = 12), 12)
+sdlConcurrent= diff(ts(Panel[Panel$State == state, "lConcurrent"], s = c(2000, 10), f = 12), 12)
+sdlunempU    = diff(ts(Panel[Panel$State == state, "lunemply_U"], s = c(2000, 10), f = 12), 12)
+
+dsdlTotal     = diff(diff(ts(Panel[Panel$State == state, "lTotal"], s = c(2000, 10), f = 12), 12))
+dsdlTitle.2   = diff(diff(ts(Panel[Panel$State == state, "lTitle.2"], s = c(2000, 10), f = 12), 12))
+dsdlTitle.16  = diff(diff(ts(Panel[Panel$State == state, "lTitle.16"], s = c(2000, 10), f = 12), 12))
+dsdlConcurrent= diff(diff(ts(Panel[Panel$State == state, "lConcurrent"], s = c(2000, 10), f = 12), 12))
+dsdlunempU    = diff(diff(ts(Panel[Panel$State == state, "lunemply_U"], s = c(2000, 10), f = 12), 12))
+
+rdlTotal     <- seasonDummy(dlTotal)$model$res %>% ts(s = c(2000, 11), f = 12)
+rdlTitle.2   <- seasonDummy(dlTitle.2)$model$res %>% ts(s = c(2000, 11), f = 12)
+rdlTitle.16  <- seasonDummy(dlTitle.16)$model$res %>% ts(s = c(2000, 11), f = 12)
+rdlConcurrent<- seasonDummy(dlConcurrent)$model$res %>% ts(s = c(2000, 11), f = 12)
+rdlunempU    <- seasonDummy(dlunempU)$model$res %>% ts(s = c(2000, 11), f = 12)
+
+
+Data.est <- cbind(dlTotal,  dlTitle.2, dlTitle.16, dlConcurrent, dlunempU,
+                  sdlTotal,  sdlTitle.2, sdlTitle.16, sdlConcurrent, sdlunempU,
+                  dsdlTotal, dsdlTitle.2, dsdlTitle.16, dsdlConcurrent, dsdlunempU,
+                  rdlTotal,  rdlTitle.2, rdlTitle.16, rdlConcurrent, rdlunempU)
+
+colnames(Data.est)  <- c( "dlTotal", "dlSSDI", "dlSSI", "dlConcurrent", "dlunemp",
+                          "sdlTotal", "sdlSSDI", "sdlSSI", "sdlConcurrent", "sdlunemp",
+                          "dsdlTotal", "dsdlSSDI", "dsdlSSI", "dsdlConcurrent", "dsdlunemp",
+                          "rdlTotal", "rdlSSDI", "rdlSSI", "rdlConcurrent", "rdlunemp")
+return(Data.est)
+}
+
+Data.est <- create_Data("AG")
+Data.est[, "dlTotal"]
+```
+
+
+```{r Stationarity}
+# # ADF test for seasonally differenced series
+ summary(ur.df(na.remove(Data.est[,"sdlTotal"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"sdlSSDI"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"sdlSSI"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"sdlConcurrent"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"sdlunemp"]), type = "none", selectlags = "AIC", lags = 12))
+
+# # ADF test for double differenced series
+ summary(ur.df(na.remove(Data.est[,"dsdlTotal"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"dsdlSSDI"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"dsdlSSI"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"dsdlConcurrent"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"dsdlunemp"]), type = "none", selectlags = "AIC", lags = 12))
+ 
+# ADF test for first differenced series net of seasonal dummies
+ summary(ur.df(na.remove(Data.est[,"rdlTotal"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"rdlSSDI"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"rdlSSI"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"rdlConcurrent"]), type = "none", selectlags = "AIC", lags = 12))
+ summary(ur.df(na.remove(Data.est[,"rdlunemp"]), type = "none", selectlags = "AIC", lags = 12))
+
+
+# Test results for national level series(AG):
+  # Annually differenced series
+   # All types of seasonally differenced application series are stationary 
+   # Seasonally differenced total unemployment is not stationary 
+   # Double differneced total unemployment is stationary 
+  # first differenced net of seasonal dummies.
+   # Results: all series are stationary 
+
+# States with the same results:
+  # CA, TX, OH, MI, IL, NC, GA. 
+
+# FL: annually differenced application only marginally stationary. 
+# NY: annually differenced application not stationary at 5%. 
+# PA: annually diffed SSI and concurrent not stationary at 5%. 1st diffed net dummies unemp not stationary at 5%
+
+
+# summary(ur.kpss(sdlTotal))
+# summary(ur.kpss(sdlTitle.2, lags = "long"))
+# summary(ur.kpss(sdlTitle.16))
+# summary(ur.kpss(sdlConcurrent, lags = "long"))
+# summary(ur.kpss(sdlunempU))
+# 
+# 
+# plot(lag(sdlunempU, -1))
+# plot(sdlTitle.2)
+# plot(sdlTitle.16)
+# plot(sdlConcurrent)
+# plot(sdlTotal)
+
+```
+
+```{r Regression}
+
+#Regression with seasonally differenced series
+fit1.DI  <- dynlm(sdlSSDI ~ L(sdlunemp, 1) + L(sdlSSDI,1:3), Data.est) 
+fit1.SSI <- dynlm(sdlSSI  ~ L(sdlunemp, 1) + L(sdlSSI, 1:3), Data.est) 
+fit1.Con <- dynlm(sdlConcurrent ~ L(sdlunemp, 1) + L(sdlConcurrent, 1:3), Data.est) 
+
+coeftest(fit1.DI,  vcov = vcovHAC)
+coeftest(fit1.SSI, vcov = vcovHAC)
+coeftest(fit1.Con, vcov = vcovHAC)
+
+# Regression with double differenced series
+fit2.DI  <- dynlm(dsdlSSDI ~ L(dsdlunemp, 1) + L(dsdlSSDI,1:3), Data.est) 
+fit2.SSI <- dynlm(dsdlSSI  ~ L(dsdlunemp, 1) + L(dsdlSSI, 1:3), Data.est) 
+fit2.Con <- dynlm(dsdlConcurrent  ~ L(dsdlunemp, 1) + L(dsdlConcurrent, 1:3), Data.est) 
+
+coeftest(fit2.DI,  vcov = vcovHAC)
+coeftest(fit2.SSI, vcov = vcovHAC)
+coeftest(fit2.Con, vcov = vcovHAC)
+
+# Regression with first differenced series net of seasonal dummies
+fit3.DI  <- dynlm(rdlSSDI ~ L(rdlunemp, 1) + L(rdlSSDI,1:3), Data.est) 
+fit3.SSI <- dynlm(rdlSSI  ~ L(rdlunemp, 1) + L(rdlSSI, 1:3), Data.est) 
+fit3.Con <- dynlm(rdlConcurrent  ~ L(rdlunemp, 1) + L(rdlConcurrent, 1:3), Data.est) 
+
+coeftest(fit3.DI,  vcov = vcovHAC)
+coeftest(fit3.SSI, vcov = vcovHAC)
+coeftest(fit3.Con, vcov = vcovHAC)
+
+
+
+```
+
+```{r Functions}
+# Function for Granger Causality test using "causality" function in vars
+test_granger <- function(mts, p, autolag = TRUE){
+  # run regular granger causality test between 2 series
+  # inputs
+    # mts: mts object containing 2 sereis
+    # p: lag order of the var model
+    # autolag: automatically select var lag order. Overwrites var.lag
+  # returns
+    # a list containing the lag order used, var mode, and the 2 test results.
+  
+  mts   <- na.remove(mts)
+  Names <- colnames(mts)
+  
+  # lag order in VAR model
+  if (autolag) var.lag <- VARselect(mts)$selection[1] else
+    var.lag <- p
+    
+  var <- VAR(mts, p = var.lag)
+  test1 <- causality(var, cause = Names[2])$Granger # unemployment causes application
+  test2 <- causality(var, cause = Names[1])$Granger # application causes unemployment
+  
+  cat(paste("Lag order = " , var.lag, "\n"))
+  print(test1);print(test2)
+  
+  invisible(list(var.lag = var.lag, var = var, test1 = test1, test2 = test2)) 
+}
+
+# define function to implement TY test for granger non-causality
+test_grangerTY <- function(mts, ur.order, p,  autolag =  TRUE){
+  # Description: implement the Toda-Yamamoto(1995) granger causality test on two series. 
+  # Inputs:
+    # mts: mts object containing 2 sereis
+    # p: lag order of the var model
+    # ur.order: max order of nonstationarity in the series contained in mts.
+    # autolag: automatically select var lag order. Overwrites var.lag
+  # Returns:
+    # A list containing the selected var lag, the original and extened var models, diagnostic test statistics,
+    # the granger-causality test results. 
+  
+#   mts <- Data.est[, c("sdlSSDI","sdlunemp")]
+#   autolag <- TRUE
+#   ur.order <- 1
+  
+  mts   <- na.remove(mts)
+  Names <- colnames(mts)
+  
+# select lag order in VAR model
+  if (autolag) var.lag <- VARselect(mts, lag = 20, type = "none")$selection[1] else
+    var.lag <- p 
+
+# fitting var model
+  var <- var.DI <- VAR(mts, p = var.lag) 
+  
+# diagonistic tests for var model 
+  serial.corr <- serial.test(var, type = "BG", lags.bg = 16)
+  roots1 <- 1/roots(var.DI)[[1]] # ">1"
+  roots2 <- 1/roots(var.DI)[[2]] # ">1"
+
+#VAR-Model with additional lag, which is though not tested.
+  var.TY<-VAR(mts, p = var.lag + ur.order, type="none")
+  var.TY$varresult[[1]]
+
+#Wald-test (H0: unemployment does not cause application)
+test1 <- wald.test(b=coef(var.TY$varresult[[1]]), Sigma=vcov(var.TY$varresult[[1]]), Terms = seq(2, by = 2, l = var.lag))
+
+#Wald.test (H0: application does not cause unemployment)
+test2 <- wald.test(b=coef(var.TY$varresult[[2]]), Sigma=vcov(var.TY$varresult[[2]]), Terms = seq(1, by = 2, l = var.lag))
+
+cat("Diagnostics:", "\n")
+cat("Serial correlation in residuals:", "\n");print(serial.corr$serial)
+cat("checking roots:", roots1, roots2, "\n", "\n")
+cat("#######################################", "\n")
+cat("Results of Granger Causality tests", "\n")
+cat("Wald-test 1 (H0: unemployment does not cause application)", "\n"); print(test1); cat("\n")
+cat("Wald-test 2 (H0: application does not cause unemployment)", "\n"); print(test2)
+
+invisible(list(var.lag = var.lag, var = var, var.TY = var.TY, serial.corr = serial.corr, roots = c(roots1, roots2), 
+               test1 = test1, test2 = test2))
+}
+
+```
+
+```{r Granger_Causality_doubleLag}
+
+## Using seasonally and regularly lagged series. 
+
+test_granger(Data.est[, c("dsdlTotal","dsdlunemp")])
+test_granger(Data.est[, c("dsdlTotal","dsdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig # selected
+# p = 3: Pass, Weakly 
+
+test_granger(Data.est[, c("dsdlSSDI","dsdlunemp")])
+test_granger(Data.est[, c("dsdlSSDI","dsdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Pass # selected
+# p = 3: Pass
+
+test_granger(Data.est[, c("dsdlSSI","dsdlunemp")])
+test_granger(Data.est[, c("dsdlSSI","dsdlunemp")], p = 3, auto = FALSE)
+
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig  # selected
+# p = 3: Pass
+
+test_granger(Data.est[, c("dsdlConcurrent","dsdlunemp")])
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Fail, both sig
+# Fail even for p = 6 (selected by AIC)
+
+```
+
+```{r Granger_Causality_TY-test_SeaLagged}
+## Results of Toda-Yamamoto(1995) Granger Causality test on seasonally differneced series
+ # 1. When allowing for a max lag of 20, 13 lags are selected by AIC for the VAR
+ # 2. Series correlation in VAR errors cannot be rejected in PT test even including 13 lags.
+      # But serial correlation is rejected by BG and ES tests for SSDI seris up to 16 lags. 
+ # 3. Accepting the VAR model with 13 lags, the results of Toda-Yamamoto test imply that
+      # the unemployment granger cause disability application, but not vice versa. 
+
+ # Hence the potiential problem is the error serial correlation in 
+
+
+
+##########
+#### SSDI
+##########
+test_grangerTY(Data.est[, c("sdlSSDI","sdlunemp")], 1)
+
+# AG
+#Wald-test (H0: unemployment does not cause application)
+# rejected at 0.05
+#Wald.test (H0: application does not cause unemployment)
+# Could not be rejected at 0.1
+
+##########
+#### SSI
+##########
+
+test_grangerTY(Data.est[, c("sdlSSI","sdlunemp")], 1)$var.lag
+
+# AG
+#Wald-test (H0: unemployment does not cause application)
+# rejected at 0.01
+#Wald.test (H0: application does not cause unemployment)
+# Could not be rejected at 0.1
+
+
+##########
+#### Concurrent
+##########
+test_grangerTY(Data.est[, c("sdlConcurrent","sdlunemp")], 1)
+
+# AG
+#Wald-test (H0: unemployment does not cause application)
+# rejected at 0.01
+#Wald.test (H0: application does not cause unemployment)
+# Could not be rejected at 0.1
+
+
+##########
+#### Total
+##########
+test_grangerTY(Data.est[, c("sdlTotal","sdlunemp")], 1)
+
+# AG
+#Wald-test (H0: unemployment does not cause application)
+# rejected at 0.01
+#Wald.test (H0: application does not cause unemployment)
+# Could not be rejected at 0.1
+
+```
+
+```{r Granger_Causality_Lag_net_SeaDummies}
+
+# Function for Granger Causality test using "causality" function in vars
+
+## Using seasonally and regularly lagged series. 
+
+test_granger(Data.est[, c("rdlTotal","rdlunemp")])
+test_granger(Data.est[, c("rdlTotal","rdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig # selected
+# p = 3: Pass, Weakly 
+
+test_granger(Data.est[, c("rdlSSDI","rdlunemp")])
+test_granger(Data.est[, c("rdlSSDI","rdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Pass # selected
+# p = 3: Pass
+
+test_granger(Data.est[, c("rdlSSI","rdlunemp")])
+test_granger(Data.est[, c("rdlSSI","rdlunemp")], p = 3, auto = FALSE)
+
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig  # selected
+# p = 3: Pass
+
+test_granger(Data.est[, c("rdlConcurrent","rdlunemp")])
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Fail, both sig
+# Fail even for p = 6 (selected by AIC)
+
+```
+
+```{r Granger_Causality_doubleLag_unemp}
+
+## Using seasonally and regularly lagged unemployment, 
+## and seasonally lagged application
+
+var <- VAR(na.remove(Data.est[, c("sdlTotal","dsdlunemp")]),p = 4)
+summary(var)
+causality(var, cause = "sdlTotal")
+causality(var, cause = "dsdlunemp")
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Fail, both sig
+# p = 4: Pass
+
+var <- VAR(na.remove(Data.est[, c("sdlSSDI","dsdlunemp")]),p = 5 )
+summary(var)
+causality(var, cause = "sdlSSDI" )
+causality(var, cause = "dsdlunemp")
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Fail, both sig
+# p = 4: Fail, both sig
+# p = 5: Pass
+
+
+var <- VAR(na.remove(Data.est[, c("sdlSSI","dsdlunemp")]),p = 1)
+summary(var)
+causality(var, cause = "sdlSSI")
+causality(var, cause = "dsdlunemp")
+
+# P = 1: Pass
+# p = 2: Fail, both insig
+# p = 3: Fail, both insig
+# p = 4: Pass
+
+
+var <- VAR(na.remove(Data.est[, c("sdlConcurrent","dsdlunemp")]),p = 4)
+summary(var)
+causality(var, cause = "sdlConcurrent")
+causality(var, cause = "dsdlunemp")
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Fail, both sig
+# p = 4: Fail, both sig
+# p = 5: Pass
+
+```
+
+```{r Granger_Causality_SeaLagged, include=FALSE}
+
+## Using seasonally lagged series. 
+
+test_granger(Data.est[, c("sdlTotal","sdlunemp")])
+test_granger(Data.est[, c("sdlTotal","sdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Pass, Weakly 
+# p = 4: pass # selected
+
+test_granger(Data.est[, c("sdlSSDI","sdlunemp")])
+test_granger(Data.est[, c("sdlSSDI","sdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Pass
+# p = 4: pass # selected
+
+test_granger(Data.est[, c("sdlSSI","sdlunemp")])
+test_granger(Data.est[, c("sdlSSI","sdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Fail, both sig  # selected
+# p = 4: Pass
+
+test_granger(Data.est[, c("sdlConcurrent","sdlunemp")])
+test_granger(Data.est[, c("sdlConcurrent","sdlunemp")], p = 3, auto = FALSE)
+
+# P = 1: Fail, both sig
+# p = 2: Fail, both sig
+# p = 3: Pass
+# p = 7: Fail, both sig
+
+```
+
+
+
+```{r GC_results_of_multiple_states}
+library(dplyr)
+# What and how to report for the granger causality test. 
+  # Region
+  # Type of test
+  # Type of Appication
+  
+  # order of VAR / df
+  # X2 and p value for direction 1: application to unemployment
+  # X2 and p value for direction 2: unemployment to application
+
+
+# Table 7
+
+get_gcResults <- function(Region){
+#Region = "CA"
+Data.est <- create_Data(Region)
+
+extract_results <- function(List){
+ results <- c(List$var.lag,
+              List$test1$p.value,
+              List$test2$p.value,
+              List$test1$statistic,
+              List$test2$statistic)
+ names(results) <- c("VAR Order",
+                     "U2A.p-value",
+                     "A2U.p-value",
+                     "U2A.Statistic",
+                     "A2U.Statistic")
+ return(results)
+}
+
+extract_resultsTY <- function(List){
+  #List =  test_grangerTY(Data.est[, c("sdlSSDI","sdlunemp")], 1)
+  #List$test1$result$chi2["chi2"]
+  
+  results <- c(List$var.lag,
+              List$test1$result$chi2["P"],
+              List$test2$result$chi2["P"],
+              List$test1$result$chi2["chi2"],
+              List$test2$result$chi2["chi2"])
+ names(results) <- c("VAR Order",
+                     "U2A.p-value",
+                     "A2U.p-value",
+                     "U2A.Statistic",
+                     "A2U.Statistic")
+ return(results)
+}
+
+df <- data.frame(    
+# Model1：double differenced series with regular procedure
+M1.SSDI = test_granger(Data.est[, c("dsdlSSDI","dsdlunemp")]) %>% extract_results,
+M1.SSI  = test_granger(Data.est[, c("dsdlSSI","dsdlunemp")])  %>% extract_results,
+M1.Con  = test_granger(Data.est[, c("dsdlConcurrent","dsdlunemp")]) %>% extract_results,
+
+# Model2: Seasonally differenced with Toda-Yamamoto procedure
+M2.SSDI = test_grangerTY(Data.est[, c("sdlSSDI","sdlunemp")], 1)  %>% extract_resultsTY,
+M2.SSI = test_grangerTY(Data.est[, c("sdlSSI","sdlunemp")], 1)    %>% extract_resultsTY,
+M2.Con = test_grangerTY(Data.est[, c("sdlConcurrent","sdlunemp")], 1) %>% extract_resultsTY,
+
+# Model3: seasonal residual of first differenced with regular procedure.
+M3.SSDI = test_granger(Data.est[, c("rdlSSDI","rdlunemp")]) %>% extract_results,
+M3.SSI = test_granger(Data.est[, c("rdlSSI","rdlunemp")]) %>% extract_results,
+M3.Con = test_granger(Data.est[, c("rdlConcurrent","rdlunemp")]) %>% extract_results
+)
+
+df <- t(df) %>% data.frame
+df$type <- rownames(df);rownames(df) <- NULL
+df$region <- Region
+df <- MoveFront(df, c("region", "type"))
+
+return(df)
+}
+
+get_gcResults("AG")
+get_gcResults("CA")
+get_gcResults("TX")
+get_gcResults("FL")
+get_gcResults("PA")
+get_gcResults("NY")
+
+gc_top <- alply(c("AG", top10),1,  get_gcResults) %>% rbind.fill %>% 
+  separate(type, into = c("model", "category"), sep = "\\.") %>%
+  arrange(model)
+gc_top10 <- gc_top
+
+
+gc_top10 %<>% dplyr::select(-ends_with("Statistic"), -VAR.Order) %>% gather(key, value, -region, -model, -category) %>% 
+  dcast(region + category ~ model + key) %>% 
+  mutate(region = factor(region, levels = c("AG", top10)),
+         category = factor(category, levels = c("SSDI", "SSI", "Con"))) %>% 
+  arrange(region, category) 
+  #%>% kable(digits = 3)
+
+xtable(gc_top10, digits = 3, label = "granger")
+
+
+
+
+
+# matrix(1:9, 3,3) %*% diag(1, 4 ,4)[-1, -4]
+# matrix(1:9, 3,3) %*% diag(1, 4 ,4)[-4, -1]
+# 
+# diag(1, 4 ,4)[-4, -1] %*% matrix(1:9, 3,3) %*% diag(1, 4 ,4)[-1, -4] 
+# 
+# (diag(1, 4 ,4)[-4, -1] %*% diag(1, 4 ,4)[-1, -4] )
+
+```
+
+
+
+
+
+
+
+
+
+

@@ -2,9 +2,9 @@
 # other codes. 
 
 
-path_proj <- "C:/Dropbox/AB_Projects_Personal/Third_year"
-path_work <- "C:/Dropbox/AB_Projects_Personal/Third_year/00_R_programs/02_Seasonal_Adjustment/New"
-setwd(path_work)
+#path_proj <- "C:/Dropbox/AB_Projects_Personal/Third_year"
+#path_work <- "C:/Dropbox/AB_Projects_Personal/Third_year/00_R_programs/02_Seasonal_Adjustment/New"
+#setwd(path_work)
 
 
 #getOption("scipen")
@@ -33,10 +33,12 @@ library(plm)
 #library(systemfit)
 #library(Matrix)
 
+
+library(stringr)
 library(reshape2)
 library(plyr)
-#library(dplyr)
-#library(tidyr)
+library(dplyr)
+library(tidyr)
 
 library(DataCombine)
 library(dummies)
@@ -62,7 +64,7 @@ library(foreach)
 # User defined functions-------------------------------------------------------
 
 
-select = function(category, region, data, start = c(2000, 10),end = c(2018,12), zoo = FALSE,
+select = function(category, region, data, start = c(2000, 10),end = c(2020,2), zoo = FALSE,
                   na.rm = FALSE, sea.rm = FALSE){
 # A function for selecting a particular seires.
 # "zoo" is required. 
@@ -86,6 +88,8 @@ select = function(category, region, data, start = c(2000, 10),end = c(2018,12), 
   
   return(series)
 }
+
+
 
 select2 = function( region, data = reg.data, start = c(2000, 10),end = c(2018,12)){
   # A function for selecting a particular state in a data frame.

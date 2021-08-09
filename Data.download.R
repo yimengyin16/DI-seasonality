@@ -1,4 +1,13 @@
 
+## MOWL documentation
+# https://www.ssa.gov/disability/data/ssa-sa-mowl.htm 
+
+
+## Checked on June 9, 2021
+#   - Lastest data release: May 4, 2021
+#   - Data up to 4-2021
+
+
 dir_data <- "Data/"
 
 # Date of downloading: 5/9/2021. up to 2021-04

@@ -5,23 +5,69 @@
   # all : The same as all0, but all data entries are adjusted for the length of "SSA working month"
 
 
+# Notes on collection of states
+
+# NW: all states and regions
+# AG: 50 states + DC
+# A8: 48 continental states (DC excluded)
+# A9: 49 continental states (DC included)
+
+
+## including AG and DC
+#  states52 
+#
+## Only states and DC, no NW
+#  statesAll
+#
+## including AG, but no DC
+#  states51
+#
+## withou NW and DC
+#  states50 
+#
+## 48 continental states, AK and HI excluded and DC excluded. 
+#  states48
+#
+## 49 continental states, AK and HI excluded and DC included. 
+#  states49 
+#
+## states.usaww
+
+
+#top5 = c("NW","CA","TX","FL","NY","PA")
+#top10 = c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
+
+
+
+
 source("General.R")
 
 # Importing raw Data ----------------------------------------------------------
 
 
+# all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2014.8.csv"), header = FALSE)
+# all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2019.08.csv"), header = FALSE)
+all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-04.csv", header = FALSE)
 
-#all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2014.8.csv"), header = FALSE)
-all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2019.08.csv"), header = FALSE)
 
 
-# "SSA-SA-MOWL-2019.08.csv" contains no variable names, need to extract variable names from "SSA-SA-MOWL-2014.7.csv"
-NAME = names(read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2014.7.csv")))
+# "SSA-SA-MOWL-2021.08.csv" contains no variable names, need to extract variable names from "SSA-SA-MOWL-2014.7.csv"
+NAME = names(read.csv("Data/MOWL/SSA-SA-MOWL-2014-07.csv"))
 names(all0) = NAME
 rm(NAME)
 
-date <- read.csv(paste0(path_proj, "/Original Data/SSA-DATES1-extended.csv"))[,1:14]
+
+
+
+# Date translation table
+# date <- read.csv("Data/MOWL/SSA-DATES1-extended.csv")[,1:14]
+# date <- date[!is.na(date$File.Name), ]
+
+date <- read.csv("Data/MOWL/SSA_DATES1-2021.csv")[,1:14]
 date <- date[!is.na(date$File.Name), ]
+
+
+
 
 
 # Create a data frame containing variables to be used.
@@ -51,13 +97,14 @@ all0 = all0[ c(  "Region.Code",
                  )]
 
 # Create variables "DI" = SSDI only + Concurrent, and "SSI" = SSI only + concurrent
+all0 <- all0 %>%  mutate(across(!c(Region.Code:Formatted.Date), ~ as.numeric(str_remove(.x, ","))))
 
-all0$DI = with(all0, Receipts..Initial.SSDI.Only. + Receipts..Initial.Concurrent.Only.)
-all0$SSI = with(all0, Receipts..Initial.SSI.Only. + Receipts..Initial.Concurrent.Only.)
+all0$DI  = with(all0, Receipts..Initial.SSDI.Only. + Receipts..Initial.Concurrent.Only.)
+all0$SSI = with(all0, Receipts..Initial.SSI.Only.  + Receipts..Initial.Concurrent.Only.)
+
 
 
 # Creating nationwide sum for each month in each year.
-
 nation = aggregate(all0[c(varlist, "DI", "SSI")],
                    list(Formatted.Date = all0$Formatted.Date),
                    sum)
@@ -66,8 +113,9 @@ nation$State.Code = "NW"
 nation$Region.Code = "NW"
 nation$Date = all0$Date[all0$State.Code == "DC"]
 
-# Creating aggregate sereis of 50 states + DC for each month in each year.
 
+
+# Creating aggregate sereis of 50 states + DC for each month in each year.
 aggregated = aggregate(all0[all0$State.Code %in% statesAll, c(varlist, "DI", "SSI")],
                    list(Formatted.Date = all0[all0$State.Code %in% statesAll,]$Formatted.Date),
                    sum)
@@ -76,8 +124,8 @@ aggregated$State.Code = "AG"
 aggregated$Region.Code = "AG"
 aggregated$Date = all0$Date[all0$State.Code == "DC"]
 
-# Creating aggregate sereis of 48 continental states each month in each year. (DC excluded)
 
+# Creating aggregate sereis of 48 continental states each month in each year. (DC excluded)
 aggregated48 = aggregate(all0[all0$State.Code %in% states48, c(varlist, "DI", "SSI")],
                        list(Formatted.Date = all0[all0$State.Code %in% states48,]$Formatted.Date),
                        sum)
@@ -87,7 +135,6 @@ aggregated48$Region.Code = "A8"
 aggregated48$Date = all0$Date[all0$State.Code == "DC"]
 
 # Creating aggregate sereis of 49 continental states each month in each year. (DC included)
-
 aggregated49 = aggregate(all0[all0$State.Code %in% states49, c(varlist, "DI", "SSI")],
                          list(Formatted.Date = all0[all0$State.Code %in% states49,]$Formatted.Date),
                          sum)
@@ -104,30 +151,33 @@ all0 = rbind(all0,nation, aggregated, aggregated49, aggregated48)
 
 # Create varialbe "Cal.Year" and "Month" in "all0"
 all0$Cal.Year = as.integer(substring(all0$Formatted.Date,1,4))
-all0$Month = as.integer(substring(all0$Formatted.Date,6,7))
+all0$Month    = as.integer(substring(all0$Formatted.Date,6,7))
 
 all0 = all0[order(as.character(all0$State.Code),all0$Cal.Year,all0$Month),]
 all0$State.Code = factor(as.character(all0$State.Code))
 
 
 # Create in "all0" a variable "No.week" by matching the varialbe "SSA.Month" in "date".
-
 all0$No.week = 0
 
 for (i in 1:nrow(all0))
   all0$No.week[i] = with(date,
                     mean(SSA.Weeks.in.Month[as.character(SSA.Month) == as.character(all0$Formatted.Date[i])]))
 
+
+
 # correcting the number of weeks in 2011-9 from 4 to 5.
+# TODO: May not be necessary now. 
+
+
+# Also check 2005-9, and 2016-9 data
 
 all0[all0$Formatted.Date == "2011-09", "No.week"] = 5
+all0[all0$Formatted.Date == "2016-09", "No.week"] = 5
 
 
 
 # Rename "all0"
-
-
-
 all0 = plyr::rename(all0, c(
                         Region.Code = "Region",
                         State.Code = "State",
@@ -158,7 +208,7 @@ all0 = plyr::rename(all0, c(
   # Adjsut all series in "all0" for number of week, and save as "all"
   # Use the same average no of week for all months
 
-avg = 1461/336
+avg = 1461/336 # (number of weeks / number of months in a 28-year cycle: 4.38)  
 all0$adj.factor = avg/all0$No.week
 
 
@@ -202,6 +252,7 @@ all = transform(all, Total      = Total.o*adj.factor,
 
 
 ## Adjusting outlier in 2004:6
+# TODO: see if the issue still exist in the lastest data
 
 New_Jun = function(category, region, Data){
 #                 category = "Title.2"
@@ -285,10 +336,11 @@ for (j in c("Total", "Title.2", "Title.16", "Concurrent", "DI", "SSI",
 
 
 ## Adjusting data error in 2014:11: application, determiniation and allowance are the same for SSI and concurrent. 
+# TODO check if the error still exist in the latest data
 
 
-
-all %<>% 
+all <- 
+	all %>% 
 	dplyr::mutate(Total     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Total, 12) + dplyr::lead(Total, 12)), Total),
 								Title.2   = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Title.2, 12) + dplyr::lead(Title.2, 12)), Title.2),
 								Title.16  = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Title.16, 12) + dplyr::lead(Title.16, 12)), Title.16),
@@ -310,11 +362,6 @@ all %<>%
 
 
 
-
-
-
-
-
 # Calculating Allowance rates as the ratios of  determinations to allowances. 
 
 all0 = transform(all0, AllowRate.Total.o      = Allow.Total.o / Det.Total.o, 
@@ -331,7 +378,7 @@ all = transform(all, AllowRate.Total      = Allow.Total / Det.Total,
 
 
 
-save(all0, all, file = "all.RData")
+save(all0, all, file = "Data/all.RData")
 
 
 rm(i,

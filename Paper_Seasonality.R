@@ -1,5 +1,5 @@
 # Creates figures and tables for the seasonality paper. 
-
+# 2021 revision
 
 ## Loading packages and data ####
 
@@ -17,12 +17,12 @@ options(xtable.include.rownames = F,
 				xtable.caption.placement = "top")
 
 source("General.R")
-source("Forecasting.main.R")
+# source("Forecasting.main.R")
 source("Modeling.HeteroPYtestSeason.R")
 
-load("Panel.RData")
+load("Data/Panel.RData")
 
-plot.path = paste0(path_work, "/paper_plot/")
+plot.path = "paper_plot/"
 
 monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
 							"Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -35,7 +35,7 @@ monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
 
 OCSB.TEST = function(x, lags = c(1,5), period = 12){
 	## This function implement OCSB test for seasonal unit root based on OCSB(1988)
-	## Critical values can be found in Franses and Hobijin (1997).(CV are not provided for all sample size, but eht Gauss code is provided.)
+	## Critical values can be found in Franses and Hobijin (1997).(CV are not provided for all sample size, but the Gauss code is provided.)
 	## Inputs
 	# x: a ts object.
 	# lags: a vector containing lags of dependent variable to be included in test regression.
@@ -104,7 +104,7 @@ seaDummy = function(category,region, data, dif = TRUE, ...){
 }
 
 
-select2 = function( region, data = reg.data, start = c(2000, 10),end = c(2018,12)){
+select2 = function( region, data = reg.data, start = c(2000, 10), end = c(2018,12)){
 	# A function for selecting a particular state in a data frame.
 	# "zoo" is required. 
 	
@@ -133,9 +133,9 @@ select2 = function( region, data = reg.data, start = c(2000, 10),end = c(2018,12
 
 
 
-# Section 2 ####
+# Section 2  Data ----
 
-#Figure1: Plot of 3 series ####
+## Figure1: Plot of 3 series ####
 #Seasonality.Pattern.Rmd
 
 AppSeries = subset(Panel, State == "AG", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
@@ -146,14 +146,17 @@ AppSeries = melt(AppSeries, id = "Formatted.Date")
 
 ThreeSeries = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
 	geom_line(size = 1 ) + 
-	geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2018, "-1-1"))), linetype = 3, size = 0.5) +            
+	geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
 	
 	scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
-	scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2018-1-1"))) + 
+	scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
 	scale_y_continuous(breaks = seq(0, 200000, 10000), labels = comma) +
 	labs(x = NULL, y = "Number of Applications", colour = NULL)+
 	theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
 ThreeSeries
+
+# 2011-09 and 2016-09 data may need adjustment: no. of weeks 4->5
+
 
 cairo_pdf(paste0(plot.path, "3series.pdf"), width = 10, height = 4.8, onefile = T)
 ThreeSeries
@@ -176,7 +179,7 @@ dev.off()
 
 
 
-# Section 3 ####
+# Section 3 Sasonal patterns ####
 
 # Table 1 Canova_Hansen test for deterministic seasonality ####
 
@@ -189,17 +192,25 @@ CH.frec = NULL      # Test for all frequencies
 
 ## log differenced series, seasonal dummies not removed.
 
+
+# Panel <- filter(Panel, year <= 2020)
+
+
 #f0 = CH.f0, frec = CH.frec)
-ch.test(select("dlTitle.2",    "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.94 
-ch.test(select("dlTitle.16",   "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.89
-ch.test(select("dlConcurrent", "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.75
-ch.test(select("dlunemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 2.12
+# Note that the month in end must be either 11 or 12
+
+# Log growth rates
+ch.test(select("dlTitle.2",    "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 1.89 
+ch.test(select("dlTitle.16",   "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 1.83
+ch.test(select("dlConcurrent", "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 1.75
+ch.test(select("dlunemply_U",  "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 2.17
 
 
-ch.test(select("Title.2",    "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.87 
-ch.test(select("Title.16",   "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.89
-ch.test(select("Concurrent", "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.52
-ch.test(select("unemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.89
+# Level series
+ch.test(select("Title.2",    "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.86 
+ch.test(select("Title.16",   "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.75
+ch.test(select("Concurrent", "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.53
+ch.test(select("unemply_U",  "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.90
 
 
 # Results: to be updated
@@ -213,17 +224,17 @@ ch.test(select("unemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)),
 
 # Notes:
 # 	
-# 	1. Data set used: 2000:10:2014:5  
+# 	1. Data set used: 2000:10:2019:12  
 #   2. The seasonal dummies are automatically romoved when using `CH.test`.
 
 
 # OCSB test ####
 
-OCSB.TEST(select("lTotal",      "NW", Panel, end = c(2018, 12)), c(1:3))
-OCSB.TEST(select("lTitle.2",    "NW", Panel, end = c(2018, 12)), c(1:3))
-OCSB.TEST(select("lTitle.16",   "NW", Panel, end = c(2018, 12)), c(1:9))
-OCSB.TEST(select("lConcurrent", "NW", Panel, end = c(2018, 12)), c(1,12:15))
-OCSB.TEST(select("lunemply_U",  "NW", Panel, end = c(2018, 12)), c(1:5))
+OCSB.TEST(select("lTotal",      "NW", Panel, end = c(2019, 12)), c(1:3))
+OCSB.TEST(select("lTitle.2",    "NW", Panel, end = c(2019, 12)), c(1:3))
+OCSB.TEST(select("lTitle.16",   "NW", Panel, end = c(2019, 12)), c(1:9))
+OCSB.TEST(select("lConcurrent", "NW", Panel, end = c(2019, 12)), c(1,12:15))
+OCSB.TEST(select("lunemply_U",  "NW", Panel, end = c(2019, 12)), c(1:5))
 
 #* Critical values from Franses and Hobijin(1997):
 
@@ -249,7 +260,7 @@ OCSB.TEST(select("lunemply_U",  "NW", Panel, end = c(2018, 12)), c(1:5))
 
 
 
-# Section 4 patterns ####
+
 
 # Seasonal Dummies regressions #### 
 
@@ -257,12 +268,14 @@ OCSB.TEST(select("lunemply_U",  "NW", Panel, end = c(2018, 12)), c(1:5))
 # Seasonal dummies for national level 
 
 # Table 2 R^2 of seasonal dummy regressions ####
+# See the rmd file
+
 
 # Note that seaDummy use first difference by default.
 
-variables = c("lTitle.2", "lTitle.16", "lConcurrent")
-dummyNW = sapply(variables, function(x) seaDummy(x,"NW"))
-dummyNW
+# variables = c("lTitle.2", "lTitle.16", "lConcurrent")
+# dummyNW = sapply(variables, function(x) seaDummy(x,"NW",data = Panel, end = c(2019, 12)))
+# dummyNW
 
 #      SSDI only  SSI only    Concurrent
 # R2    0.764      0.7295       0.5613
@@ -271,7 +284,7 @@ dummyNW
 
 
 # Table 3: Coefficients of seasonal dummies for national aggregates ####
-dummyNW_coeff <- sapply(variables, function(x) seaDummy(x,"NW")$model$coeff)
+dummyNW_coeff <- sapply(variables, function(x) seaDummy(x,"NW", data = Panel, end = c(2019, 12))$model$coeff)
 dummyNW_coeff %>% t
 
 
@@ -300,6 +313,8 @@ dummy.Concurrent_state %<>%
 	as.data.frame() %>% 
 	tidyr::gather(state, value, -vars) %>% 
 	dplyr::mutate(vars = factor(vars, levels = monthName))
+
+
 
 
 # Boxplots seasonal dummy coefficients  

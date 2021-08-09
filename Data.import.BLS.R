@@ -18,16 +18,18 @@
 
 # Import employment statistics from Local Area Unemployment Statistics(LAUS).----------------
 
-#   # Import seasonally unadjusted series at state level
+# Last run on 6/13/2021
+# Data up to 04/2021
+# Import seasonally unadjusted series at state level
 # emplyU = read.table("http://download.bls.gov/pub/time.series/la/la.data.2.AllStatesU",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-#   # Import seasonally adjusted series at state level
+# # Import seasonally adjusted series at state level
 # emplyS = read.table("http://download.bls.gov/pub/time.series/la/la.data.3.AllStatesS",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-# 
-# save(emplyU, emplyS, file = "C:\\Dropbox\\AB_Projects_Personal\\Third_year\\Original Data\\emplyData.RData")
+#
+# save(emplyU, emplyS, file = "Data/emplyData.RData")
 
-load(paste0(path_proj, "\\Original Data\\emplyData.RData"))
+load("Data/emplyData.RData")
 
 
 emply = rbind(emplyU,emplyS)
@@ -52,7 +54,8 @@ emply = emply[emply$Month != 13,] # delete the year average
 
 # Create variables: Unemployment rate, unemployment, employment, and labor forece
 emply = dcast(emply, adj + State + Cal.Year + Month ~ measure)
-emply = rename(emply, c("03" = "uRate", "04" = "unemply", "05" = "emply", "06" = "labor"))
+emply = plyr::rename(emply, c("03" = "uRate", "04" = "unemply", "05" = "emply", "06" = "labor"))
+
 
 # Convert elements in State into state name abbreviations.
 
@@ -76,11 +79,18 @@ emply$State = as.factor(convertAbbr(emply$State))
 
 # Import national level employment statistics from CPS --------------------
 
+# Last run on 6/13/2021
+# Data up to 5/2021
 # CPSdata = read.table("http://download.bls.gov/pub/time.series/ln/ln.data.1.AllData",
 #                     header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-# save(CPSdata, file = "C:\\Dropbox\\AB_Projects_Personal\\Third_year\\Original Data\\CPSdata.RData")
+
+# CPSdata = read.table("C:\\Users\\yimen\\Google Drive\\AB_Projects_Personal\\Third_year\\Original Data\\ln.data.1.AllData.txt",
+#                     header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
+
+#save(CPSdata, file = "Data/CPSdata.RData")
  
-load(paste0(path_proj, "\\Original Data\\CPSdata.RData"))
+load("Data/CPSdata.RData")
+
 
 emplyNW = CPSdata[CPSdata$series_id %in% c("LNS11000000", #adjusted labor force
                                            "LNS12000000", #adjusted employment
@@ -89,7 +99,7 @@ emplyNW = CPSdata[CPSdata$series_id %in% c("LNS11000000", #adjusted labor force
                                            "LNU01000000", #unadjusted labor force
                                            "LNU02000000", #unadjusted employment
                                            "LNU03000000", #unadjusted unemployment
-                                           "LNU04000000" #unadjusted unemployment rate
+                                           "LNU04000000"  #unadjusted unemployment rate
                                            #"LNS13027659",  #adjusted unemployment for less than high school
                                            #"LNS13027660",  #adjusted unemployment for high school no college
                                            #"LNS13027689"   #adjusted unemployment for some college
@@ -118,7 +128,7 @@ emplyNW = emplyNW[emplyNW$Month != 13,] # delete the year average in unajusted s
 
 # Create variables: Unemployment rate, unemployment, employment, and labor forece
 emplyNW = dcast(emplyNW, adj + State + Cal.Year + Month ~ measure)
-emplyNW = rename(emplyNW, c("400" = "uRate", "300" = "unemply", "200" = "emply", "100" = "labor"
+emplyNW = plyr::rename(emplyNW, c("400" = "uRate", "300" = "unemply", "200" = "emply", "100" = "labor"
                             #"359" = "unemply1", "360" = "unemply2", "389" = "unemply3"
                             ))
 
@@ -138,7 +148,10 @@ rm(CPSdata)
 
 # Merge the state level and national level data ---------------------------
 
-  emply = rbind(emply,emplyNW, emplyAG, emplyA8, emplyA9)
+  #emply = rbind(emply,emplyNW, emplyAG, emplyA8, emplyA9)
+
+  emply = bind_rows(emply,emplyNW, emplyAG, emplyA8, emplyA9)
+
   emply = melt(emply, id = c("adj", "State", "Cal.Year","Month"))
   emply = dcast(emply, State + Cal.Year + Month ~ variable + adj) 
 
@@ -149,9 +162,14 @@ rm(CPSdata)
 # emply$unemply.factor = with(emply, unemply_U/unemply_S)
 # emply$labor.factor = with(emply, labor_U/labor_S)
 
+emply <-   
+  emply %>% 
+  dplyr::select(-starts_with("07"), 
+                -starts_with("08"),
+                -starts_with("09"))
 
 # Save the data into emply.RData
-save(emply, file = "emply.RData")
+save(emply, file = "Data/emply.RData")
 
 rm(emplyNW,emplyS,emplyU,emplyAG, emplyA8, emplyA9)
 

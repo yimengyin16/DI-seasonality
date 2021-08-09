@@ -20,6 +20,12 @@ library(magrittr)
 library("tidyr")
 library("knitr")
 library(lubridate)
+library(tsibble)
+library(fable)
+library(feasts)
+library(dplyr)
+library(purrr)
+library(gridExtra)
 
 options(xtable.include.rownames = F,
         xtable.booktabs = T,
@@ -43,68 +49,597 @@ Panel <-
 Panel_all <- Panel
 Panel <- filter(Panel,date_yearmon <= "2020-2")
 
+
+
+```
+
+
+
+# Plotting Application Series 
+
+```{r applicationSeries}
+# Figure 2
+# AG
+AppSeries = subset(Panel_all, State == "AG", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+
+AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
+AppSeries = melt(AppSeries, id = "Formatted.Date")
+
+
+ThreeSeries.AG = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
+              geom_line(size = 1 ) + 
+              geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
+              
+              scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
+              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+              labs(
+                   x = NULL, y = "Number of Applications", colour = NULL)+
+              theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
+ThreeSeries.AG
+
+
+plot_3series <- function(State_slc){
+  AppSeries = subset(Panel_all, State == State_slc, c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+  
+  AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
+  AppSeries = melt(AppSeries, id = "Formatted.Date")
+  
+  
+  ThreeSeries = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
+                geom_line(size = 1 ) + 
+                geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
+                
+                scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
+                scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+                labs(title = State_slc,
+                     x = NULL, y = "Number of Applications", colour = NULL)+
+                theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
+  #ThreeSeries
+  
+  
+}
+
+
+threeSeries_large <- 
+  map(c("AG", "CA", "TX", "NY", "FL", "PA", "OH", "MI", "IL", "WI", "NC", "MN"), plot_3series)
+
+
+
+threeSeries_large 
+
+
+cairo_pdf(paste0(plot.path, "3series_large.pdf"), width = 10, height = 4.8, onefile = T)
+threeSeries_large 
+dev.off()
+
 ```
 
 
 
 
-Contents:
-  1. Description of Seasonality in Applications and Unemployment 
-  2. Relationship between seasonal components of disability applications and unemployment
 
+# Explore
 
 ```{r eval=FALSE, include=FALSE}
-#' Figures and tables for the seasonality paper
+
+panel_ts <- Panel_all
+
+panel_ts %<>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index)
 
 
-# Figure 2: 
-# - applicationSeries
-
-# Figure 3: spectral Density 
-# - can be removed
-
-# Figure 4: apply&unemplyLag.pdf 
-#   - Plot_Seasonal_Dummies
-
-# Figure 5: BoxplotDummycoeff.pdf
-#   - Boxplot
-
-# Figure 6: Allow_App_Dummies_AG.pdf
-#   - State_by_State_Comparison_plots
+panel_ts %<>%  
+  tsibble(key = State, index = date_yearmon) 
 
 
+df.test <- 
+  panel_ts$u %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent) %>% 
+  mutate(across(c(Title.2, Title.16, Concurrent), as.numeric ))
 
 
-# Table 1:
-#  - See Paper_seasonality.R
-
-# Table 2: Magnitudes of Seasonality in Disability Applications
-#  -  Table_of_R^2_for _top_5
-
-# Table 3: "Coefficients of Seasonal Dummies: Growth Rate of National Aggregate"
-#  - Table_of_seasonal_dummies_for_nationawide
-
-# Table 4: Test for heterogeneity of seasonality
-# -  PYtest
-
-# Table 5: "Relationship between deterministic seasonal components of DB application and 1 month lag of unemployment"
-#  - seasonal_IV_Top5
+df.test.AG <- 
+  df.test %>% 
+  filter(State == "AG",
+         date_yearmon <= yearmonth("2020-02"))
 
 
-# Table 6 
-# - Seasonality.SeasonUroot.Rmd: Tables_of_HEGY_test
+fit.AG <- 
+  df.test.AG %>% 
+  model(m1 = ETS(Title.2  ~ error("M") + trend("Ad") + season("M")),
+        m2 = ETS(Title.2  ~ error("M") + trend("Ad") + season("A"))
+        )
 
-# Table 7
-# - Seasonality.Univariate_Granger: GC_results_of_multiple_states
+df.test.AG$
 
 
 
-# For Table A1-A3 in appendix
-# - Table_of_R2_and_seasonal_dummies_for_top5
+m1 <- fit.AG$m1[[1]]
+
+report(m1)
+components(m1) %>% autoplot
+
+m1_decomp <- components(m1)
+
+
+m1_decomp %>% 
+  gg_season(season, labels = "both")
+
+m1_decomp %>% 
+  gg_subseries(season)
+
+
+
+
+
+
+
+components(fit.AG) %>% 
+  autoplot
+
+
+fabletools::forecast(fit.AG, h = 14) %>% 
+  autoplot()
+
+
+
+# Producing forecasts using ETS
+fit.AG.DI <- 
+  df.test.AG %>% 
+  model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M")))
+
+
+fit.AG.SSI <- 
+  df.test.AG %>% 
+  model(ETS(Title.16  ~ error("M") + trend("Ad") + season("M")))
+
+fit.AG.concurrent <- 
+  df.test.AG %>% 
+  model(ETS(Concurrent  ~ error("M") + trend("Ad") + season("M")))
+
+
+fc.AG.DI         <- fabletools::forecast(fit.AG.DI, h = 14)
+fc.AG.SSI        <- fabletools::forecast(fit.AG.SSI, h = 14)
+fc.AG.concurrent <- fabletools::forecast(fit.AG.concurrent, h = 14)
+
+
+fc.AG.DI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2018-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.2), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") +
+  coord_cartesian(ylim = c(0, 100e3)) + 
+  labs(title = paste0("AG",": SSDI, ETS forecast vs actual"))
+
+
+fc.AG.SSI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2018-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.16), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 100e3)) +
+  labs(title = paste0("AG",": SSI, ETS forecast vs actual") )
+  
+
+fc.AG.concurrent %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2018-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Concurrent), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 100e3)) + 
+  labs(title = paste0("AG",": concurrent, ETS forecast vs actual") )
+
+
+```
+
+
+# Seasonal patterns using models
+
+```{r}
+
+panel_ts <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+panel_ts %>% names
+
+df_model <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent, dlunemply_U, unemply_U, uRate_U,
+                AllowRate.Title.2, AllowRate.Title.16, AllowRate.Concurrent,
+                Allow.Title.2, Allow.Title.16, Allow.Concurrent ) %>% 
+  mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
+  filter(date_yearmon <= yearmonth("2020-02")) %>% 
+  group_by(State) %>% 
+  mutate(dunemply_U = unemply_U - dplyr::lag(unemply_U, 1),
+         disbApp_tot = Title.2 + Title.16 + Concurrent) 
+
+
+
+## ETS model, national total
+
+df_model_AG <- 
+  df_model %>% filter(State == "AG")
+
+ets_fml_AA <- ~ error("A") + trend("Ad") + season("A")
+ets_fml_MM <- ~ error("M") + trend("Ad") + season("M")
+ets_fml_   <- ~ error("M") + trend("Ad") + season("M")
+
+
+mod_ets_SSDI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Title.2 ~.)))
+
+mod_ets_SSI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Title.16 ~.)))
+
+mod_ets_conc <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Concurrent ~.)))
+
+
+mod_ets_allow.SSDI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Allow.Title.2 ~.)))
+
+mod_ets_allow.SSI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Allow.Title.16 ~.)))
+
+mod_ets_allow.conc <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Allow.Concurrent ~.)))
+
+mod_ets_allowRate.SSDI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, AllowRate.Title.2 ~.)))
+
+mod_ets_allowRate.SSI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, AllowRate.Title.16 ~.)))
+
+mod_ets_allowRate.conc <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, AllowRate.Concurrent ~.)))
+
+
+
+mod_ets_unemply <-  # number of unemployment
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, unemply_U ~.)))
+
+mod_ets_uRate <-    # unemployment rate
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, uRate_U ~.)))
+
+mod_ets_dunemply <- # level changes in unemployment 
+  df_model_AG[-1,] %>% 
+  model(mod_ets = ETS(update(ets_fml_AA, dunemply_U ~ .)))
+
+mod_ets_dlunemply <- # % changes in unemployment 
+  df_model_AG[-1,] %>% 
+   model(mod_ets = ETS(update(ets_fml_AA, dlunemply_U ~ .)))
+
+## Check seasonality
+
+# disability application
+
+# number
+components(mod_ets_SSDI) %>% gg_season(season, label = "both")
+components(mod_ets_SSI)  %>% gg_season(season, label = "both")
+components(mod_ets_conc) %>% gg_season(season, label = "both")
+
+# allowance
+components(mod_ets_allow.SSDI) %>% gg_season(season, label = "both")
+components(mod_ets_allow.SSI)  %>% gg_season(season, label = "both")
+components(mod_ets_allow.conc) %>% gg_season(season, label = "both")
+
+# allowance rate
+components(mod_ets_allowRate.SSDI) %>% gg_season(season, label = "both")
+components(mod_ets_allowRate.SSI)  %>% gg_season(season, label = "both")
+components(mod_ets_allowRate.conc) %>% gg_season(season, label = "both")
+
+
+
+
+# No. unemployment
+components(mod_ets_unemply) %>% gg_season(season, label = "both")
+
+# unemployment rate
+components(mod_ets_uRate) %>% gg_season(season, label = "both")
+
+# changes in unemployment
+components(mod_ets_dunemply) %>% gg_season(season, label = "both")
+
+# change rate of unemployement
+components(mod_ets_dlunemply) %>% gg_season(season, label = "both")
+
+
+## check decompostion
+components(mod_ets_SSDI) %>% autoplot()
+components(mod_ets_SSI)  %>% autoplot()
+components(mod_ets_conc) %>% autoplot()
+components(mod_ets_unemply) %>% autoplot()
+components(mod_ets_dlunemply) %>% autoplot()
+components(mod_ets_uRate) %>% autoplot()
+
+
+## convert additive seasonality to multiplicative seasonality
+# 
+components(mod_ets_dunemply) %>% 
+  mutate(season_mul = (dunemply_U - remainder) /  (dunemply_U - remainder - season)) %>% 
+  gg_season(season_mul, label = "both")
+
+
+# Try STL decomposition
+
+x <- 
+  df_model_AG %>% 
+  model(STL(Title.2 ~ trend() + season()))
+
+components(x) %>% autoplot
+
+components(x) %>% gg_season(season_year)
+
+
+```
+
+
+
+# Seasonal patterns using models, all states
+```{r}
+
+panel_ts <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+# panel_ts %>% names
+
+df_model <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, 
+                Title.2, Title.16, Concurrent, 
+                AllowRate.Title.2, AllowRate.Title.16, AllowRate.Concurrent,
+                Allow.Title.2, Allow.Title.16, Allow.Concurrent,
+                dlunemply_U, unemply_U, uRate_U) %>% 
+  mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
+  filter(date_yearmon <= yearmonth("2020-02")) %>% 
+  group_by(State) %>% 
+  mutate(dunemply_U  = unemply_U - dplyr::lag(unemply_U, 1),
+         disbApp_tot = Title.2 + Title.16 + Concurrent) 
+
+
+
+# Estimate ETS models for all variables and all states
+
+ets_fml_AA <- ~ error("A") + trend("Ad") + season("A")
+ets_fml_MM <- ~ error("M") + trend("Ad") + season("M")
+
+df_model %>% rename(y = "Title.2")
+
+mod_ets <- list(
+  
+  SSDI = df_model %>% model(SSDI = ETS(update(ets_fml_MM, Title.2 ~.))),
+  SSI  = df_model %>% model(SSI  = ETS(update(ets_fml_MM, Title.16 ~.))),
+  conc = df_model %>% model(conc = ETS(update(ets_fml_MM, Concurrent ~.))),
+  
+  allow.SSDI = df_model %>% model(allow.SSDI = ETS(update(ets_fml_MM, Allow.Title.2 ~.))),
+  allow.SSI  = df_model %>% model(allow.SSI  = ETS(update(ets_fml_MM, Allow.Title.16 ~.))),
+  allow.conc = df_model %>% model(allow.conc = ETS(update(ets_fml_MM, Allow.Concurrent ~.))),
+
+  allowRate.SSDI = df_model %>% model(allowRate.SSDI = ETS(update(ets_fml_MM, AllowRate.Title.2 ~.))),
+  allowRate.SSI  = df_model %>% model(allowRate.SSI  = ETS(update(ets_fml_MM, AllowRate.Title.16 ~.))),
+  allowRate.conc = df_model %>% model(allowRate.conc = ETS(update(ets_fml_MM, AllowRate.Concurrent ~.))),
+
+  # number of unemployment
+  unemply = df_model %>% model(unemply = ETS(update(ets_fml_MM, unemply_U ~.))),
+  # unemployment rate
+  uRate = df_model %>% model(uRate = ETS(update(ets_fml_MM, uRate_U ~.))),
+  # level changes in unemployment 
+  dunemply = 
+    df_model %>%  
+    filter(date_yearmon > yearmonth("2000-10")) %>% 
+    model(dunemply = ETS(update(ets_fml_AA, dunemply_U ~ .))),
+  
+  # % changes in unemployment 
+  dlunemply = 
+      df_model %>% 
+      filter(date_yearmon > yearmonth("2000-10")) %>% 
+      model(dlunemply = ETS(update(ets_fml_AA, dlunemply_U ~ .)))
+)
+
+# Components
+comp_ets <- plyr::llply(mod_ets, components)
+
+x <- 
+bind_rows(comp_ets)
+
+
+x %>% filter(.model == "SSDI", State == "AG")
+
+
+# marrangeGrob(list(fig_DI, fig_SSI, fig_concurrent), ncol = 3, nrow = 1)
+
+```
+
+
+
+
+
+
+# Counter factual analysis 
+
+```{r}
+
+# Function for plotting projected vs actual applications for three types, 
+# each in one plot
+
+panel_ts <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+
+df.test <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent) %>% 
+  mutate(across(c(Title.2, Title.16, Concurrent), as.numeric ))
+
+
+plot_counterFct <- function(state_slc){
+
+# state_slc <- "AG"
+  
+df.test.AG <- 
+  df.test %>% 
+  filter(State == state_slc,
+         date_yearmon <= yearmonth("2020-02"))
+
+# fit.AG <- 
+#   df.test.AG %>% 
+#   model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M"))
+#         )
+#report(fit.AG)# components(fit.AG) %>% 
+# autoplot
+
+
+fabletools::forecast(fit.AG, h = 14) %>% 
+  autoplot()
+
+
+
+# Producing forecasts using ETS
+fit.AG.DI <- 
+  df.test.AG %>% 
+  model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M")))
+
+
+fit.AG.SSI <- 
+  df.test.AG %>% 
+  model(ETS(Title.16  ~ error("M") + trend("Ad") + season("M")))
+
+fit.AG.concurrent <- 
+  df.test.AG %>% 
+  model(ETS(Concurrent  ~ error("M") + trend("Ad") + season("M")))
+
+
+fc.AG.DI         <- fabletools::forecast(fit.AG.DI, h = 14)
+fc.AG.SSI        <- fabletools::forecast(fit.AG.SSI, h = 14)
+fc.AG.concurrent <- fabletools::forecast(fit.AG.concurrent, h = 14)
+
+max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
+
+
+fig_DI <- 
+fc.AG.DI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.2), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") +
+  coord_cartesian(ylim = c(0, max_y)) + 
+  labs(title = paste0(state_slc, ": SSDI"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+  theme(legend.position = "bottom")
+
+fig_SSI <- 
+fc.AG.SSI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.16), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, max_y)) +
+  labs(title = paste0(state_slc, ": SSI"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+   theme(legend.position = "bottom")
+  
+fig_concurrent <- 
+fc.AG.concurrent %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Concurrent), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, max_y)) + 
+  labs(title = paste0(state_slc, ": Concurrent"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+   theme(legend.position = "bottom")
+
+
+marrangeGrob(list(fig_DI, fig_SSI, fig_concurrent), ncol = 3, nrow = 1)
+
+}
+
+
+fig_AG <- plot_counterFct("AG")
+fig_CA <- plot_counterFct("CA")
+fig_TX <- plot_counterFct("TX")
+fig_NY <- plot_counterFct("NY")
+fig_FL <- plot_counterFct("FL")
+fig_PA <- plot_counterFct("PA")
+fig_NC <- plot_counterFct("NC")
+fig_WI <- plot_counterFct("WI")
+
+
+cairo_pdf(paste0(plot.path, "counterFct1.pdf"), width = 20, height = 5.6, onefile = T)
+fig_AG
+fig_CA
+fig_TX
+fig_NY
+fig_FL
+fig_PA
+fig_NC
+fig_WI
+dev.off()
+
+
+# ggsave("text.pdf",  width = 10, height = 4, scale = 1.4)
+
+```
+
+
+
+# Describing seasonality with decomposition
+
+```{r}
+#    
+
+df.test %>% distinct(State)
+
+## seasonal plots:
+# Useful in identifying years in which the pattern changes
+df.test %>% 
+  filter(State =="AG") %>% 
+  gg_season(Title.2, labels = "both")
+
+
+## seasonal subplots
+# Useful in indentifying changes within particular seasons
+df.test %>% 
+  filter(State =="AG") %>% 
+  gg_subseries(Title.2)
+
+
+
+
+
 
 
 
 ```
+
+
+
+
+
 
 
 # 1. Description of Seasonality in Applications and Unemployment 

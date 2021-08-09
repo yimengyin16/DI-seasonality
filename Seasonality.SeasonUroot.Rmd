@@ -20,9 +20,20 @@ options(xtable.include.rownames = F,
 
 
 source("General.R")
-source("Forecasting.main.R")
+# source("Forecasting.main.R")
 
-load("Panel.RData")
+load("data/Panel.RData")
+
+
+Panel <- 
+  Panel %>% 
+  mutate(date_yearmon =  as.yearmon(Formatted.Date))
+
+
+Panel_all <- Panel
+Panel <- filter(Panel,date_yearmon <= "2020-2")
+
+end_Panel <- c(2020, 2)
 
 ```
 
@@ -32,24 +43,26 @@ lvarName = "lTotal"
 dlvarName = "dlTotal"
 stateName = "NW"
 
-# log 
-lTotal      = window(select("lTotal", stateName, Panel), s = c(2000,10))
-lTitle.2    = window(select("lTitle.2", stateName, Panel), s = c(2000,10))
-lTitle.16   = window(select("lTitle.16", stateName, Panel), s = c(2000,10))
-lConcurrent = window(select("lConcurrent", stateName, Panel), s = c(2000,10))
 
-lunempU = window(select("lunemply_U", stateName, Panel), s = c(2000,11))
-lunempS = window(select("lunemply_S", stateName, Panel), s = c(2000,11)) 
+
+# log 
+lTotal      = window(select("lTotal",      stateName, Panel, end = end_Panel), s = c(2000,10))
+lTitle.2    = window(select("lTitle.2",    stateName, Panel, end = end_Panel), s = c(2000,10))
+lTitle.16   = window(select("lTitle.16",   stateName, Panel, end = end_Panel), s = c(2000,10))
+lConcurrent = window(select("lConcurrent", stateName, Panel, end = end_Panel), s = c(2000,10))
+
+lunempU = window(select("lunemply_U", stateName, Panel, end = end_Panel), s = c(2000,11))
+lunempS = window(select("lunemply_S", stateName, Panel, end = end_Panel), s = c(2000,11)) 
 Month = as.factor(Panel$Month[Panel$State == "A8"])
 
 # first differenced log 
-dlTotal      = window(select("dlTotal", stateName, Panel), s = c(2000,11))
-dlTitle.2    = window(select("dlTitle.2", stateName, Panel), s = c(2000,11))
-dlTitle.16   = window(select("dlTitle.16", stateName, Panel), s = c(2000,11))
-dlConcurrent = window(select("dlConcurrent", stateName, Panel), s = c(2000,11))
+dlTotal      = window(select("dlTotal",      stateName, Panel, end = end_Panel), s = c(2000,11))
+dlTitle.2    = window(select("dlTitle.2",    stateName, Panel, end = end_Panel), s = c(2000,11))
+dlTitle.16   = window(select("dlTitle.16",   stateName, Panel, end = end_Panel), s = c(2000,11))
+dlConcurrent = window(select("dlConcurrent", stateName, Panel, end = end_Panel), s = c(2000,11))
 
-dlunempU = window(select("dlunemply_U", stateName, Panel), s = c(2000,11))
-dlunempS = window(select("dlunemply_S", stateName, Panel), s = c(2000,11))
+dlunempU = window(select("dlunemply_U", stateName, Panel, end = end_Panel), s = c(2000,11))
+dlunempS = window(select("dlunemply_S", stateName, Panel, end = end_Panel), s = c(2000,11))
 dMonth = Month[-1] 
 
 # first differenced log, net of seasonal dummies
@@ -82,6 +95,8 @@ Espasa and Mayo (2013, pp723):
 
 ```{r, results='markup' ,tidy=TRUE}
 
+# Table 1: CH test
+
 ## Settings for CH.test 
 CH.f0 = 1          # Whether the 1st lag of dependent variable is included in auxiliar regression
 CH.frec = NULL      # Test for all frequencies
@@ -97,20 +112,20 @@ CH.frec = NULL      # Test for all frequencies
 # CH.test(select("dlunemply_U", "A8", data = Panel, na.rm = T), f0 = CH.f0, frec = CH.frec)
 
 
-ch.test(select("Title.2",    "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.87 
-ch.test(select("Title.16",   "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.89
-ch.test(select("Concurrent", "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.72
-ch.test(select("unemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE)   # 1.89
+ch.test(select("Title.2",    "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.84 
+ch.test(select("Title.16",   "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.90
+ch.test(select("Concurrent", "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.70
+ch.test(select("unemply_U",  "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE)   # 1.90
 
 
-ch.test(select("dlTitle.2",    "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.94 
-ch.test(select("dlTitle.16",   "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.89
-ch.test(select("dlConcurrent", "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 1.81
-ch.test(select("dlunemply_U",  "NW",  data = Panel, na.rm = T, end = c(2018, 12)), lag1 = TRUE) # 2.12
+ch.test(select("dlTitle.2",    "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 1.92 
+ch.test(select("dlTitle.16",   "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 1.94
+ch.test(select("dlConcurrent", "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 1.79
+ch.test(select("dlunemply_U",  "NW",  data = Panel, na.rm = T, end = c(2019, 12)), lag1 = TRUE) # 2.17
 
 
 
-rm(CH.f0, CH.frec)
+# rm(CH.f0, CH.frec)
 
 ```
 
@@ -134,7 +149,7 @@ Notes:
 
 Need to check the original paper OCSB(1988) to confirm the test regression. 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 ## My function
 
 OCSB.TEST = function(x, lags = c(1,5), period = 12){
@@ -320,6 +335,8 @@ HEGYT.table
 ```{r Tables_of_HEGY_test}
 
 options(digits = 3)
+
+# Table 6a and 6b
 
 print(xtable(HEGY.table))
 print(xtable(HEGYT.table))
