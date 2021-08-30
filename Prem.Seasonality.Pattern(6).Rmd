@@ -32,6 +32,7 @@ options(xtable.include.rownames = F,
         xtable.booktabs = T,
         xtable.caption.placement = "top")
 
+
 source("General.R")
 # source("Forecasting.main.R")
 
@@ -44,16 +45,28 @@ dir.fig_newVer = "paper_plot/fig_newVer/"
 monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-Panel <- 
-  Panel %>% 
+
+Panel_unadj <- 
+  Panel_unadj %>% 
   mutate(date_yearmon =  as.yearmon(Formatted.Date))
 
 
+
+
+
+
 Panel_all <- Panel
-Panel <- filter(Panel,date_yearmon <= "2020-2")
+Panel     <- filter(Panel,date_yearmon <= "2020-2")
+
+Panel_unadj_all <- Panel_unadj
+Panel_unadj     <- filter(Panel,date_yearmon <= "2020-2")
+
 
 # names(Panel)
 
+# x <- 
+# Panel %>% filter(State == "NY") %>% 
+#   dplyr::select(State, date_yearmon, Title.16)
 
 
 # Key variables for the paper
@@ -101,6 +114,10 @@ Panel <- filter(Panel,date_yearmon <= "2020-2")
 #   - Region
 }
 
+x <- 
+Panel %>% 
+  dplyr::select(State, date_yearmon, UICC, UIIC)
+
 
 ```
 
@@ -140,30 +157,52 @@ plot_3series <- function(State_slc){
   
   
   ThreeSeries = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
-                geom_line(size = 1 ) + 
+                geom_line(size = 0.8 ) +
+                geom_point() + 
+                coord_cartesian(ylim = c(0, NA)) + 
                 geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
                 
                 scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
                 scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
                 labs(title = State_slc,
-                     x = NULL, y = "Number of Applications", colour = NULL)+
-                theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
+                     x = NULL, y = "Number of Applications", colour = NULL) + 
+                theme(legend.position = "bottom")
+                # theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
   #ThreeSeries
-  
-  
+
 }
+
+
+states_order0 <- 
+  Panel %>% 
+  as.data.frame %>% 
+  group_by(State) %>% 
+  mutate(disbApp_tot = Title.2 + Title.16 + Concurrent) %>% 
+  summarise(totApp = sum(disbApp_tot)) %>% 
+  arrange(desc(totApp)) %>% 
+  mutate(state = as.character(State)) %>% 
+  pull(state)
+
+states_order0 <- c(setdiff(states_order0, c("NW", "A9", "A8")))
 
 
 threeSeries_large <- 
   map(c("AG", "CA", "TX", "NY", "FL", "PA", "OH", "MI", "IL", "WI", "NC", "MN"), plot_3series)
 
+threeSeries_ordered <- 
+  map(c(states_order0), plot_3series)
 
-
-threeSeries_large[[1]] 
+# threeSeries_ordered[[1]]
+# threeSeries_large[[1]] 
 
 
 cairo_pdf(paste0(plot.path, "fig_explore/3series_large.pdf"), width = 10, height = 4.8, onefile = T)
 threeSeries_large 
+dev.off()
+
+
+cairo_pdf(paste0(plot.path, "fig_explore/3series_ordered.pdf"), width = 10, height = 5.2, onefile = T)
+threeSeries_ordered 
 dev.off()
 
 ```
@@ -192,11 +231,12 @@ df_model <-
                 dlunemply_U, unemply_U, uRate_U,
                 UIIC, UICC) %>% 
   mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
-  filter(date_yearmon <= yearmonth("2020-02")) %>% 
+  filter(date_yearmon <= yearmonth("2020-02"),
+         State != "DC") %>% 
   group_by(State) %>% 
   mutate(dunemply_U  = unemply_U - dplyr::lag(unemply_U, 1),
          disbApp_tot = Title.2 + Title.16 + Concurrent) 
-
+# Note DC is excluded because no UI data
 
 
 # Estimate ETS models for all variables and all states
@@ -211,7 +251,7 @@ mod_ets <- list(
   SSDI = df_model %>% rename(y = Title.2)    %>%  model(SSDI = ETS(update(ets_fml_MM, y~.))),
   SSI  = df_model %>% rename(y = Title.16)   %>%  model(SSI  = ETS(update(ets_fml_MM, y~.))),
   conc = df_model %>% rename(y = Concurrent) %>%  model(conc = ETS(update(ets_fml_MM, y~.))),
-  
+
   allow.SSDI = df_model %>% rename(y = Allow.Title.2)    %>% model(allow.SSDI = ETS(update(ets_fml_MM, y~.))),
   allow.SSI  = df_model %>% rename(y = Allow.Title.16)   %>% model(allow.SSI  = ETS(update(ets_fml_MM, y~.))),
   allow.conc = df_model %>% rename(y = Allow.Concurrent) %>% model(allow.conc = ETS(update(ets_fml_MM, y~.))),
@@ -224,23 +264,28 @@ mod_ets <- list(
   unemply = df_model %>% rename(y = unemply_U) %>% model(unemply = ETS(update(ets_fml_MM, y~.))),
   # unemployment rate
   uRate = df_model %>% rename(y = uRate_U) %>% model(uRate = ETS(update(ets_fml_MM,y~.))),
-  # level changes in unemployment 
-  dunemply = 
-    df_model %>%  
-    rename(y = dunemply_U) %>% 
-    filter(date_yearmon > yearmonth("2000-10")) %>% 
+  # level changes in unemployment
+  dunemply =
+    df_model %>%
+    rename(y = dunemply_U) %>%
+    filter(date_yearmon > yearmonth("2000-10")) %>%
     model(dunemply = ETS(update(ets_fml_AA, y~ .))),
-  
-  # % changes in unemployment 
-  dlunemply = 
-      df_model %>% 
-      rename(y = dlunemply_U) %>% 
-      filter(date_yearmon > yearmonth("2000-10")) %>% 
+
+  # % changes in unemployment
+  dlunemply =
+      df_model %>%
+      rename(y = dlunemply_U) %>%
+      filter(date_yearmon > yearmonth("2000-10")) %>%
       model(dlunemply = ETS(update(ets_fml_AA, y ~ .))),
   
   UIIC = df_model %>% rename(y = UIIC) %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
   UICC = df_model %>% rename(y = UICC) %>% model(UICC = ETS(update(ets_fml_MM, y ~.)))
 )
+
+
+
+
+
 
 # Components
 comp_ets <- plyr::llply(mod_ets, components)
@@ -562,7 +607,7 @@ dev.off()
 ```
 
 
-## Plots for paper
+## Plots for paper, DI and unemployment
 ```{r}
 
 ## Outputs from sections above
@@ -575,7 +620,6 @@ dev.off()
 #   - 1.  Three categoaries of disability application  
 #   - 2a. Unemployment and UI initial claims (SSA month)
 #   - 2b. Unemployment(2 month lag) and SSDI applications
-
 
 
 df_comp_ets$.model %>% unique 
@@ -722,7 +766,62 @@ fig_UIDI_US <-
 
 fig_UIDI_US
 
-ggsave(fig_UIDI_US, filename = paste0(dir.fig_newVer, "fig_UIDI_UL.png"), width = 7 , height = 7)
+ggsave(fig_UIDI_US, filename = paste0(dir.fig_newVer, "fig_season_UIDI_UL.png"), width = 7 , height = 7)
+
+
+```
+
+## Plots for paper, DI allowance
+
+```{r}
+
+# Plotting seasonal patterns of application, allowance and allowance rate 
+
+
+plot_season_avg_allow <- function(slc){  
+  # slc = "US"
+  
+  # fig_allow <- 
+  df_season_avg %>% 
+  filter(State  %in% slc,
+        .model %in% c("SSDI", "SSI", "conc",
+                      "allow.SSDI",     "allow.SSI",     "allow.conc",
+                      "allowRate.SSDI", "allowRate.SSI", "allowRate.conc")
+        ) %>% 
+  mutate(DItype = str_extract(.model, "SSDI|SSI|conc"),
+         DItype = factor(DItype, c("SSDI", "SSI", "conc"), c("SSDI only", "SSI only", "Concurrent")),
+         Var    = case_when(
+                    .model %in% c("SSDI", "SSI", "conc") ~ "Number of applications",
+                    str_detect(.model, "allow\\.") ~ "Number of allowance",
+                    str_detect(.model, "allowRate\\.") ~ "Allowance Rate"
+         ),
+         Var = factor(Var, c("Number of applications", "Number of allowance", "Allowance Rate"))
+  ) %>% 
+  # arrange(.model) %>% 
+  ggplot(aes(x = Month, y = season_avg, color = Var)) + theme_bw() + 
+  facet_wrap(DItype ~ ., nrow = 3) + 
+  geom_line(linetype =1, size = 0.5, alpha = 0.2) + 
+  geom_point(size = 2) + 
+  geom_hline(yintercept = 1, color = "grey70") + 
+  coord_cartesian(ylim = c(0.87, 1.13)) + 
+  scale_x_continuous(breaks = 1:12, labels = month_lab) + 
+  scale_y_continuous(breaks = seq(0, 2, 0.05)) + 
+  scale_color_manual(values = c("black", "blue", "green")) + 
+  labs(# title = slc,
+       x = NULL,
+       y = "Average seasonal factor (multiplicative)",
+       color = NULL) + 
+  theme(# legend.position = "bottom",
+        
+        legend.position = "bottom")
+  
+}
+
+
+fig_season_allow_US <- plot_season_avg_allow("US")
+
+ggsave(fig_season_allow_US, filename = paste0(dir.fig_newVer, "fig_season_avg_allow.png"), width = 7.1 , height = 8.4, dpi = 300 )
+
 
 
 ```
@@ -1001,6 +1100,47 @@ ggsave(fig_counterFct_season, filename = paste0(dir.fig_newVer, "fig_counterFct_
 
 
 ```
+
+
+
+
+
+
+# Variation across states
+
+```{r}
+## Boxplots for all three types of DI applications
+
+# results from previous blocks: df_season_avg (seasonal patterns using models, Plots for paper)
+
+df_season_avg$.model %>% unique 
+
+
+fig_season_boxplot <- 
+df_season_avg %>% 
+  filter(.model %in% c("SSDI", "SSI", "conc"),
+         State %in% c(state.abb, "DC")) %>% 
+  mutate(.model = factor(.model, c("SSDI", "SSI", "conc"),
+                                 c("SSDI only", "SSI only", "Concurrent")),
+         Month = factor(Month, 1:12, 
+                               month.abb)
+         ) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = (Month), y = season_avg)) + theme_bw() + facet_wrap(.model ~., ncol = 1) + 
+  geom_boxplot(outlier.size = 1) + 
+  geom_hline(yintercept = 1, linetype = 2, color = "grey70") + 
+  coord_cartesian(ylim = c(0.75, 1.25)) + 
+  labs(x = NULL,
+       y = "Seasonal factor (multiplicative)")
+
+  
+ggsave(fig_season_boxplot, filename = paste0(dir.fig_newVer, "fig_season_boxplots.png"),
+       width = 7.7, height = 9.9) 
+
+
+```
+
+
 
 
 

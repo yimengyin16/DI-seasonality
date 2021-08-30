@@ -532,10 +532,10 @@ states52 = c("AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL", "GA",
 
 # Only states and DC, no NW
 statesAll = c("AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL", "GA",
-             "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA", "MA", "MD", 
-             "ME", "MI", "MN", "MO", "MS", "MT", "NC", "ND", "NE", "NH", 
-             "NJ", "NM", "NV", "NY", "OH", "OK", "OR", "PA", "RI", 
-             "SC", "SD", "TN", "TX", "UT", "VA", "VT", "WA", "WI", "WV", "WY")
+              "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA", "MA", "MD", 
+              "ME", "MI", "MN", "MO", "MS", "MT", "NC", "ND", "NE", "NH", 
+              "NJ", "NM", "NV", "NY", "OH", "OK", "OR", "PA", "RI", 
+              "SC", "SD", "TN", "TX", "UT", "VA", "VT", "WA", "WI", "WV", "WY")
 
 # including AG, but no DC
 states51 = c("AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DE", "FL", "GA",
@@ -645,6 +645,11 @@ usaw = usaw[states48,] # adjust the row order of the matrix.
 
 
 dim(usaw)
+
+
+# Month names
+monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
 # variance1 = aggregate(dlTitle.2 ~ State, data = reg.data, FUN = "var")

@@ -24,6 +24,12 @@
 #  - Data.Combine.R
 
 
+# Detecting and correcting outliers in DI series
+#  - Data.outlier.R
+
+
+
+
 ## Producing results for the paper ----
 
 #  - Seasonality.Pattern.Rmd (w/ index for figures and tables)

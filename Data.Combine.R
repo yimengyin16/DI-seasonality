@@ -37,7 +37,7 @@ data_UI_SSA <-
 
 Panel = merge(all0, all, by = c("State", "Cal.Year", "Month","Formatted.Date","Region","No.week","adj.factor"))
 Panel = merge(Panel, emply, by = c("State", "Cal.Year", "Month"))
-Panel = merge(Panel, data_UI_SSA, by = c("State", "Cal.Year", "Month"))
+Panel = merge(Panel, data_UI_SSA, by = c("State", "Cal.Year", "Month"), all.x = TRUE)
 
 Panel = Panel[order(Panel$State, Panel$Cal.Year, Panel$Month), ] # make the order of months correct
 

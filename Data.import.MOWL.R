@@ -102,7 +102,7 @@ all0 <- all0 %>%  mutate(across(!c(Region.Code:Formatted.Date), ~ as.numeric(str
 all0$DI  = with(all0, Receipts..Initial.SSDI.Only. + Receipts..Initial.Concurrent.Only.)
 all0$SSI = with(all0, Receipts..Initial.SSI.Only.  + Receipts..Initial.Concurrent.Only.)
 
-
+all0
 
 # Creating nationwide sum for each month in each year.
 nation = aggregate(all0[c(varlist, "DI", "SSI")],
@@ -346,16 +346,16 @@ all <-
 								Title.16  = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Title.16, 12) + dplyr::lead(Title.16, 12)), Title.16),
 								Concurrent= ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Concurrent, 12) + dplyr::lead(Concurrent, 12)), Concurrent),
 								
-								Det.Total     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Total, 12) + dplyr::lead(Det.Total, 12)), Det.Total),
-								Det.Title.2     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Title.2, 12) + dplyr::lead(Det.Title.2, 12)), Det.Title.2),
-								Det.Title.16     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Title.16, 12) + dplyr::lead(Det.Title.16, 12)), Det.Title.16),
-								Det.Concurrent     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Concurrent, 12) + dplyr::lead(Det.Concurrent, 12)), Det.Concurrent),
+								Det.Total      = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Total, 12) + dplyr::lead(Det.Total, 12)), Det.Total),
+								Det.Title.2    = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Title.2, 12) + dplyr::lead(Det.Title.2, 12)), Det.Title.2),
+								Det.Title.16   = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Title.16, 12) + dplyr::lead(Det.Title.16, 12)), Det.Title.16),
+								Det.Concurrent = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Det.Concurrent, 12) + dplyr::lead(Det.Concurrent, 12)), Det.Concurrent),
 								
 							
-								Allow.Total     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Total, 12) + dplyr::lead(Allow.Total, 12)), Allow.Total),
-								Allow.Title.2     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Title.2, 12) + dplyr::lead(Allow.Title.2, 12)), Allow.Title.2),
-								Allow.Title.16     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Title.16, 12) + dplyr::lead(Allow.Title.16, 12)), Allow.Title.16),
-								Allow.Concurrent     = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Concurrent, 12) + dplyr::lead(Allow.Concurrent, 12)), Allow.Concurrent)
+								Allow.Total      = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Total, 12) + dplyr::lead(Allow.Total, 12)), Allow.Total),
+								Allow.Title.2    = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Title.2, 12) + dplyr::lead(Allow.Title.2, 12)), Allow.Title.2),
+								Allow.Title.16   = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Title.16, 12) + dplyr::lead(Allow.Title.16, 12)), Allow.Title.16),
+								Allow.Concurrent = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Concurrent, 12) + dplyr::lead(Allow.Concurrent, 12)), Allow.Concurrent)
 								
 								)
 	
@@ -389,7 +389,4 @@ rm(i,
    avg,
    varlist
    )
-
-
-
 
