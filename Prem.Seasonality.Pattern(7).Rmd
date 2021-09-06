@@ -748,7 +748,7 @@ plot_region1 <- function(region_slc, region_name, df = df_fig.Region1){
 #region_slc <- region_ATL
 #region_name <-  "Atlanta Region"
 
-df_fig.Region1 %>% 
+df %>% 
   filter(State %in% region_slc) %>% 
   mutate(State = factor(State, region_slc)) %>% 
   ggplot(aes(x = mon, y = season, color = .model)) + theme_bw() + 
@@ -764,7 +764,7 @@ df_fig.Region1 %>%
 }
 
 
-cairo_pdf(paste0("paper_plot/fig_explore/", "fig_region1.pdf"), width = 15*0.9, height = 10*0.9, onefile = T)
+cairo_pdf(paste0("paper_plot/fig_explore/", "fig_SeasonByRegion_DI.pdf"), width = 15*0.9, height = 10*0.9, onefile = T)
 
 plot_region1(region_ATL, "Atlanta Region")
 
@@ -776,17 +776,77 @@ plot_region1(region_DAL, "Dallas Region")
 
 plot_region1(region_DEN, "Denver Region")
 
-plot_region1(region_KCM, "Kansas Region")   + theme(plot.margin = grid::unit(c(5.5, 5.5, 180, 5.5), "points"))
+plot_region1(region_KCM, "Kansas Region")   + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
 
-plot_region1(region_NYC, "New York Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 390, 5.5), "points"))
+plot_region1(region_NYC, "New York Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 400, 5.5), "points"))
 
-plot_region1(region_PHL, "Philadelphia Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 180, 5.5), "points"))
+plot_region1(region_PHL, "Philadelphia Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
 
-plot_region1(region_SEA, "Seattle Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 180, 5.5), "points"))
+plot_region1(region_SEA, "Seattle Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
 
-plot_region1(region_SFO, "San Fransisco Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 180, 5.5), "points"))
+plot_region1(region_SFO, "San Fransisco Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
 
 dev.off()
+
+
+
+
+## Output 2: Three DI application types
+df_fig.Region2 <- 
+  df_fig.Region %>% 
+  filter(.model %in% c("SSDI", "unemply")) %>% 
+  mutate(.model = factor(.model, c("SSDI", "unemply"),
+                                 c("SSDI", "unemployment\n(2-month lag)"))
+         # mon    = factor(mon, 1:12, month.abb)
+         )
+  
+
+plot_region2 <- function(region_slc, region_name, df = df_fig.Region2){
+
+# df = df_fig.Region2
+# region_slc <- region_ATL
+# region_name <-  "Atlanta Region"
+
+df %>% 
+  filter(State %in% region_slc) %>% 
+  mutate(State = factor(State, region_slc)) %>% 
+  ggplot(aes(x = mon, y = season, color = .model)) + theme_bw() + 
+  facet_wrap( ~ State) + 
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept = 1:12, linetype = 3, color = "grey70") + 
+  scale_x_continuous(breaks = 1:12, labels = month.abb) + 
+  labs(x = "Month",
+       y = "Average seasonal factor",
+       title = region_name,
+       color = "Variable")
+}
+
+
+cairo_pdf(paste0("paper_plot/fig_explore/", "fig_SeasonByRegion_DIwUnemploy.pdf"), width = 15*0.9, height = 10*0.9, onefile = T)
+
+plot_region2(region_ATL, "Atlanta Region")
+
+plot_region2(region_BOS, "Boston Region")
+
+plot_region2(region_CHI, "Chicago Region")
+
+plot_region2(region_DAL, "Dallas Region")
+
+plot_region2(region_DEN, "Denver Region")
+
+plot_region2(region_KCM, "Kansas Region")   + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
+
+plot_region2(region_NYC, "New York Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 400, 5.5), "points"))
+
+plot_region2(region_PHL, "Philadelphia Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
+
+plot_region2(region_SEA, "Seattle Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
+
+plot_region2(region_SFO, "San Fransisco Region") + theme(plot.margin = grid::unit(c(5.5, 5.5, 200, 5.5), "points"))
+
+dev.off()
+
 
 
 ```

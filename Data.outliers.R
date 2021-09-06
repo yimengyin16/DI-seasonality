@@ -293,51 +293,51 @@ Panel = transform(Panel,
 
 # Creating lags of log 
 
-Panel = pdata.frame(Panel, c("State","index"))
-
-Panel$LlTotal       = lag(Panel$lTotal)
-Panel$LlTitle.2     = lag(Panel$lTitle.2)
-Panel$LlTitle.16    = lag(Panel$lTitle.16)
-Panel$LlConcurrent  = lag(Panel$lConcurrent)
-
-
-
-
-#Creating Log differenced variables.
-
-Panel$dlTotal       = diff(Panel$lTotal)
-Panel$dlTitle.2     = diff(Panel$lTitle.2)
-Panel$dlTitle.16    = diff(Panel$lTitle.16)
-Panel$dlConcurrent  = diff(Panel$lConcurrent)
-
-
-
-# Creating lags of log difference
-
-# 1st Lag
-Panel$LdlTotal       = lag(Panel$dlTotal)
-Panel$LdlTitle.2     = lag(Panel$dlTitle.2)
-Panel$LdlTitle.16    = lag(Panel$dlTitle.16)
-Panel$LdlConcurrent  = lag(Panel$dlConcurrent)
-
-
-# 2nd Lag
-Panel$L2dlTotal       = lag(Panel$dlTotal, 2)
-Panel$L2dlTitle.2     = lag(Panel$dlTitle.2, 2)
-Panel$L2dlTitle.16    = lag(Panel$dlTitle.16, 2)
-Panel$L2dlConcurrent  = lag(Panel$dlConcurrent, 2)
-
-
-# 3rd Lag
-Panel$L3dlTotal       = lag(Panel$dlTotal, 3)
-Panel$L3dlTitle.2     = lag(Panel$dlTitle.2, 3)
-Panel$L3dlTitle.16    = lag(Panel$dlTitle.16, 3)
-Panel$L3dlConcurrent  = lag(Panel$dlConcurrent, 3)
-
-#fix(Panel)
-
-Panel <-  as_tibble(Panel)
-Panel$index <-  as.numeric(Panel$index)
+# Panel = pdata.frame(Panel, c("State","index"))
+# 
+# Panel$LlTotal       = lag(Panel$lTotal)
+# Panel$LlTitle.2     = lag(Panel$lTitle.2)
+# Panel$LlTitle.16    = lag(Panel$lTitle.16)
+# Panel$LlConcurrent  = lag(Panel$lConcurrent)
+# 
+# 
+# 
+# 
+# #Creating Log differenced variables.
+# 
+# Panel$dlTotal       = diff(Panel$lTotal)
+# Panel$dlTitle.2     = diff(Panel$lTitle.2)
+# Panel$dlTitle.16    = diff(Panel$lTitle.16)
+# Panel$dlConcurrent  = diff(Panel$lConcurrent)
+# 
+# 
+# 
+# # Creating lags of log difference
+# 
+# # 1st Lag
+# Panel$LdlTotal       = lag(Panel$dlTotal)
+# Panel$LdlTitle.2     = lag(Panel$dlTitle.2)
+# Panel$LdlTitle.16    = lag(Panel$dlTitle.16)
+# Panel$LdlConcurrent  = lag(Panel$dlConcurrent)
+# 
+# 
+# # 2nd Lag
+# Panel$L2dlTotal       = lag(Panel$dlTotal, 2)
+# Panel$L2dlTitle.2     = lag(Panel$dlTitle.2, 2)
+# Panel$L2dlTitle.16    = lag(Panel$dlTitle.16, 2)
+# Panel$L2dlConcurrent  = lag(Panel$dlConcurrent, 2)
+# 
+# 
+# # 3rd Lag
+# Panel$L3dlTotal       = lag(Panel$dlTotal, 3)
+# Panel$L3dlTitle.2     = lag(Panel$dlTitle.2, 3)
+# Panel$L3dlTitle.16    = lag(Panel$dlTitle.16, 3)
+# Panel$L3dlConcurrent  = lag(Panel$dlConcurrent, 3)
+# 
+# #fix(Panel)
+# 
+# Panel <-  as_tibble(Panel)
+# Panel$index <-  as.numeric(Panel$index)
 
 
 # Panel_unadj %>% filter(State == "AG")

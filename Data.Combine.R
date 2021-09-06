@@ -70,80 +70,80 @@ Panel = transform(Panel,
 
 # Creating lags of log 
 
-Panel = pdata.frame(Panel, c("State","index"))
-
-Panel$LlTotal       = lag(Panel$lTotal)
-Panel$LlTitle.2     = lag(Panel$lTitle.2)
-Panel$LlTitle.16    = lag(Panel$lTitle.16)
-Panel$LlConcurrent  = lag(Panel$lConcurrent)
-
-Panel$Llunemply_S   = lag(Panel$lunemply_S)
-Panel$Llunemply_U   = lag(Panel$lunemply_U)
-Panel$Llemply_S     = lag(Panel$lemply_S)
-Panel$Llemply_U     = lag(Panel$lemply_U)
-Panel$Lllabor_S     = lag(Panel$llabor_S)
-Panel$Lllabor_U     = lag(Panel$llabor_U)
-
-
-#Creating Log differenced variables.
-
-Panel$dlTotal       = diff(Panel$lTotal)
-Panel$dlTitle.2     = diff(Panel$lTitle.2)
-Panel$dlTitle.16    = diff(Panel$lTitle.16)
-Panel$dlConcurrent  = diff(Panel$lConcurrent)
-
-Panel$dlunemply_S   = diff(Panel$lunemply_S)
-Panel$dlunemply_U   = diff(Panel$lunemply_U)
-Panel$dlemply_S     = diff(Panel$lemply_S)
-Panel$dlemply_U     = diff(Panel$lemply_U)
-Panel$dllabor_S     = diff(Panel$llabor_S)
-Panel$dllabor_U     = diff(Panel$llabor_U)
-
-# Creating lags of log difference
-
-# 1st Lag
-Panel$LdlTotal       = lag(Panel$dlTotal)
-Panel$LdlTitle.2     = lag(Panel$dlTitle.2)
-Panel$LdlTitle.16    = lag(Panel$dlTitle.16)
-Panel$LdlConcurrent  = lag(Panel$dlConcurrent)
-
-Panel$Ldlunemply_S   = lag(Panel$dlunemply_S)
-Panel$Ldlunemply_U   = lag(Panel$dlunemply_U)
-Panel$Ldlemply_S     = lag(Panel$dlemply_S)
-Panel$Ldlemply_U     = lag(Panel$dlemply_U)
-Panel$Ldllabor_S     = lag(Panel$dllabor_S)
-Panel$Ldllabor_U     = lag(Panel$dllabor_U)
-
-# 2nd Lag
-Panel$L2dlTotal       = lag(Panel$dlTotal, 2)
-Panel$L2dlTitle.2     = lag(Panel$dlTitle.2, 2)
-Panel$L2dlTitle.16    = lag(Panel$dlTitle.16, 2)
-Panel$L2dlConcurrent  = lag(Panel$dlConcurrent, 2)
-
-Panel$L2dlunemply_S   = lag(Panel$dlunemply_S, 2)
-Panel$L2dlunemply_U   = lag(Panel$dlunemply_U, 2)
-Panel$L2dlemply_S     = lag(Panel$dlemply_S, 2)
-Panel$L2dlemply_U     = lag(Panel$dlemply_U, 2)
-Panel$L2dllabor_S     = lag(Panel$dllabor_S, 2)
-Panel$L2dllabor_U     = lag(Panel$dllabor_U, 2)
-
-# 3rd Lag
-Panel$L3dlTotal       = lag(Panel$dlTotal, 3)
-Panel$L3dlTitle.2     = lag(Panel$dlTitle.2, 3)
-Panel$L3dlTitle.16    = lag(Panel$dlTitle.16, 3)
-Panel$L3dlConcurrent  = lag(Panel$dlConcurrent, 3)
-
-Panel$L3dlunemply_S   = lag(Panel$dlunemply_S, 3)
-Panel$L3dlunemply_U   = lag(Panel$dlunemply_U, 3)
-Panel$L3dlemply_S     = lag(Panel$dlemply_S, 3)
-Panel$L3dlemply_U     = lag(Panel$dlemply_U, 3)
-Panel$L3dllabor_S     = lag(Panel$dllabor_S, 3)
-Panel$L3dllabor_U     = lag(Panel$dllabor_U, 3)
-
-#fix(Panel)
-
-Panel = as.data.frame(Panel)
-Panel$index = as.numeric(Panel$index)
+# Panel = pdata.frame(Panel, c("State","index"))
+# 
+# Panel$LlTotal       = lag(Panel$lTotal)
+# Panel$LlTitle.2     = lag(Panel$lTitle.2)
+# Panel$LlTitle.16    = lag(Panel$lTitle.16)
+# Panel$LlConcurrent  = lag(Panel$lConcurrent)
+# 
+# Panel$Llunemply_S   = lag(Panel$lunemply_S)
+# Panel$Llunemply_U   = lag(Panel$lunemply_U)
+# Panel$Llemply_S     = lag(Panel$lemply_S)
+# Panel$Llemply_U     = lag(Panel$lemply_U)
+# Panel$Lllabor_S     = lag(Panel$llabor_S)
+# Panel$Lllabor_U     = lag(Panel$llabor_U)
+# 
+# 
+# #Creating Log differenced variables.
+# 
+# Panel$dlTotal       = diff(Panel$lTotal)
+# Panel$dlTitle.2     = diff(Panel$lTitle.2)
+# Panel$dlTitle.16    = diff(Panel$lTitle.16)
+# Panel$dlConcurrent  = diff(Panel$lConcurrent)
+# 
+# Panel$dlunemply_S   = diff(Panel$lunemply_S)
+# Panel$dlunemply_U   = diff(Panel$lunemply_U)
+# Panel$dlemply_S     = diff(Panel$lemply_S)
+# Panel$dlemply_U     = diff(Panel$lemply_U)
+# Panel$dllabor_S     = diff(Panel$llabor_S)
+# Panel$dllabor_U     = diff(Panel$llabor_U)
+# 
+# # Creating lags of log difference
+# 
+# # 1st Lag
+# Panel$LdlTotal       = lag(Panel$dlTotal)
+# Panel$LdlTitle.2     = lag(Panel$dlTitle.2)
+# Panel$LdlTitle.16    = lag(Panel$dlTitle.16)
+# Panel$LdlConcurrent  = lag(Panel$dlConcurrent)
+# 
+# Panel$Ldlunemply_S   = lag(Panel$dlunemply_S)
+# Panel$Ldlunemply_U   = lag(Panel$dlunemply_U)
+# Panel$Ldlemply_S     = lag(Panel$dlemply_S)
+# Panel$Ldlemply_U     = lag(Panel$dlemply_U)
+# Panel$Ldllabor_S     = lag(Panel$dllabor_S)
+# Panel$Ldllabor_U     = lag(Panel$dllabor_U)
+# 
+# # 2nd Lag
+# Panel$L2dlTotal       = lag(Panel$dlTotal, 2)
+# Panel$L2dlTitle.2     = lag(Panel$dlTitle.2, 2)
+# Panel$L2dlTitle.16    = lag(Panel$dlTitle.16, 2)
+# Panel$L2dlConcurrent  = lag(Panel$dlConcurrent, 2)
+# 
+# Panel$L2dlunemply_S   = lag(Panel$dlunemply_S, 2)
+# Panel$L2dlunemply_U   = lag(Panel$dlunemply_U, 2)
+# Panel$L2dlemply_S     = lag(Panel$dlemply_S, 2)
+# Panel$L2dlemply_U     = lag(Panel$dlemply_U, 2)
+# Panel$L2dllabor_S     = lag(Panel$dllabor_S, 2)
+# Panel$L2dllabor_U     = lag(Panel$dllabor_U, 2)
+# 
+# # 3rd Lag
+# Panel$L3dlTotal       = lag(Panel$dlTotal, 3)
+# Panel$L3dlTitle.2     = lag(Panel$dlTitle.2, 3)
+# Panel$L3dlTitle.16    = lag(Panel$dlTitle.16, 3)
+# Panel$L3dlConcurrent  = lag(Panel$dlConcurrent, 3)
+# 
+# Panel$L3dlunemply_S   = lag(Panel$dlunemply_S, 3)
+# Panel$L3dlunemply_U   = lag(Panel$dlunemply_U, 3)
+# Panel$L3dlemply_S     = lag(Panel$dlemply_S, 3)
+# Panel$L3dlemply_U     = lag(Panel$dlemply_U, 3)
+# Panel$L3dllabor_S     = lag(Panel$dllabor_S, 3)
+# Panel$L3dllabor_U     = lag(Panel$dllabor_U, 3)
+# 
+# #fix(Panel)
+# 
+# Panel = as.data.frame(Panel)
+# Panel$index = as.numeric(Panel$index)
 
 
 ## Creating application series net of OLS seasonal dummies. 
