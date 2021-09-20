@@ -16,6 +16,9 @@
 # Loading and processing BLS (employment) data
 #  - Data.import.BLS.R
 
+# Loading and processing BEA (employment by industry and state) data
+#  - Data.import.BEA.R
+
 # Loading and processing UI data
 #  - Data.import.UI.R
 
