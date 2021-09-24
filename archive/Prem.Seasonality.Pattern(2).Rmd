@@ -1,0 +1,1890 @@
+---
+title: "Seasonal patterns"
+output:
+  pdf_document:
+    includes:
+      in_header: LatexPreamble.sty
+    number_sections: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r preamble, echo=FALSE, include=FALSE}
+
+library(plyr)
+library(ggplot2)
+library(scales)
+library(xtable)
+#library(DataCombine) # it loads dplyr!
+library(magrittr)
+library("tidyr")
+library("knitr")
+library(lubridate)
+library(tsibble)
+library(fable)
+library(feasts)
+library(dplyr)
+library(purrr)
+library(gridExtra)
+
+options(xtable.include.rownames = F,
+        xtable.booktabs = T,
+        xtable.caption.placement = "top")
+
+source("General.R")
+# source("Forecasting.main.R")
+
+load("Data/Panel.RData")
+
+plot.path = "paper_plot/"
+
+monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+Panel <- 
+  Panel %>% 
+  mutate(date_yearmon =  as.yearmon(Formatted.Date))
+
+
+Panel_all <- Panel
+Panel <- filter(Panel,date_yearmon <= "2020-2")
+
+
+
+```
+
+
+
+# Plotting Application Series 
+
+```{r applicationSeries}
+# Figure 2
+# AG
+AppSeries = subset(Panel_all, State == "AG", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+
+AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
+AppSeries = melt(AppSeries, id = "Formatted.Date")
+
+
+ThreeSeries.AG = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
+              geom_line(size = 1 ) + 
+              geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
+              
+              scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
+              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+              labs(
+                   x = NULL, y = "Number of Applications", colour = NULL)+
+              theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
+ThreeSeries.AG
+
+
+plot_3series <- function(State_slc){
+  AppSeries = subset(Panel_all, State == State_slc, c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+  
+  AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
+  AppSeries = melt(AppSeries, id = "Formatted.Date")
+  
+  
+  ThreeSeries = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
+                geom_line(size = 1 ) + 
+                geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
+                
+                scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
+                scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+                labs(title = State_slc,
+                     x = NULL, y = "Number of Applications", colour = NULL)+
+                theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
+  #ThreeSeries
+  
+  
+}
+
+
+threeSeries_large <- 
+  map(c("AG", "CA", "TX", "NY", "FL", "PA", "OH", "MI", "IL", "WI", "NC", "MN"), plot_3series)
+
+
+
+threeSeries_large 
+
+
+cairo_pdf(paste0(plot.path, "3series_large.pdf"), width = 10, height = 4.8, onefile = T)
+threeSeries_large 
+dev.off()
+
+```
+
+
+
+
+
+# Explore
+
+```{r eval=FALSE, include=FALSE}
+
+panel_ts <- Panel_all
+
+panel_ts %<>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index)
+
+
+panel_ts %<>%  
+  tsibble(key = State, index = date_yearmon) 
+
+
+df.test <- 
+  panel_ts$u %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent) %>% 
+  mutate(across(c(Title.2, Title.16, Concurrent), as.numeric ))
+
+
+df.test.AG <- 
+  df.test %>% 
+  filter(State == "AG",
+         date_yearmon <= yearmonth("2020-02"))
+
+
+fit.AG <- 
+  df.test.AG %>% 
+  model(m1 = ETS(Title.2  ~ error("M") + trend("Ad") + season("M")),
+        m2 = ETS(Title.2  ~ error("M") + trend("Ad") + season("A"))
+        )
+
+df.test.AG$
+
+
+
+m1 <- fit.AG$m1[[1]]
+
+report(m1)
+components(m1) %>% autoplot
+
+m1_decomp <- components(m1)
+
+
+m1_decomp %>% 
+  gg_season(season, labels = "both")
+
+m1_decomp %>% 
+  gg_subseries(season)
+
+
+
+
+
+
+
+components(fit.AG) %>% 
+  autoplot
+
+
+fabletools::forecast(fit.AG, h = 14) %>% 
+  autoplot()
+
+
+
+# Producing forecasts using ETS
+fit.AG.DI <- 
+  df.test.AG %>% 
+  model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M")))
+
+
+fit.AG.SSI <- 
+  df.test.AG %>% 
+  model(ETS(Title.16  ~ error("M") + trend("Ad") + season("M")))
+
+fit.AG.concurrent <- 
+  df.test.AG %>% 
+  model(ETS(Concurrent  ~ error("M") + trend("Ad") + season("M")))
+
+
+fc.AG.DI         <- fabletools::forecast(fit.AG.DI, h = 14)
+fc.AG.SSI        <- fabletools::forecast(fit.AG.SSI, h = 14)
+fc.AG.concurrent <- fabletools::forecast(fit.AG.concurrent, h = 14)
+
+
+fc.AG.DI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2018-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.2), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") +
+  coord_cartesian(ylim = c(0, 100e3)) + 
+  labs(title = paste0("AG",": SSDI, ETS forecast vs actual"))
+
+
+fc.AG.SSI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2018-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.16), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 100e3)) +
+  labs(title = paste0("AG",": SSI, ETS forecast vs actual") )
+  
+
+fc.AG.concurrent %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2018-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Concurrent), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 100e3)) + 
+  labs(title = paste0("AG",": concurrent, ETS forecast vs actual") )
+
+
+```
+
+
+# Seasonal patterns using models
+
+```{r}
+
+panel_ts <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+panel_ts %>% names
+
+df_model <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent, dlunemply_U, unemply_U, uRate_U,
+                AllowRate.Title.2, AllowRate.Title.16, AllowRate.Concurrent,
+                Allow.Title.2, Allow.Title.16, Allow.Concurrent ) %>% 
+  mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
+  filter(date_yearmon <= yearmonth("2020-02")) %>% 
+  group_by(State) %>% 
+  mutate(dunemply_U = unemply_U - dplyr::lag(unemply_U, 1),
+         disbApp_tot = Title.2 + Title.16 + Concurrent) 
+
+
+
+## ETS model, national total
+
+df_model_AG <- 
+  df_model %>% filter(State == "AG")
+
+ets_fml_AA <- ~ error("A") + trend("Ad") + season("A")
+ets_fml_MM <- ~ error("M") + trend("Ad") + season("M")
+ets_fml_   <- ~ error("M") + trend("Ad") + season("M")
+
+
+mod_ets_SSDI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Title.2 ~.)))
+
+mod_ets_SSI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Title.16 ~.)))
+
+mod_ets_conc <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Concurrent ~.)))
+
+
+mod_ets_allow.SSDI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Allow.Title.2 ~.)))
+
+mod_ets_allow.SSI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Allow.Title.16 ~.)))
+
+mod_ets_allow.conc <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, Allow.Concurrent ~.)))
+
+mod_ets_allowRate.SSDI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, AllowRate.Title.2 ~.)))
+
+mod_ets_allowRate.SSI <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, AllowRate.Title.16 ~.)))
+
+mod_ets_allowRate.conc <- 
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, AllowRate.Concurrent ~.)))
+
+
+
+mod_ets_unemply <-  # number of unemployment
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, unemply_U ~.)))
+
+mod_ets_uRate <-    # unemployment rate
+  df_model_AG %>% 
+  model(mod_ets = ETS(update(ets_fml_MM, uRate_U ~.)))
+
+mod_ets_dunemply <- # level changes in unemployment 
+  df_model_AG[-1,] %>% 
+  model(mod_ets = ETS(update(ets_fml_AA, dunemply_U ~ .)))
+
+mod_ets_dlunemply <- # % changes in unemployment 
+  df_model_AG[-1,] %>% 
+   model(mod_ets = ETS(update(ets_fml_AA, dlunemply_U ~ .)))
+
+## Check seasonality
+
+# disability application
+
+# number
+components(mod_ets_SSDI) %>% gg_season(season, label = "both")
+components(mod_ets_SSI)  %>% gg_season(season, label = "both")
+components(mod_ets_conc) %>% gg_season(season, label = "both")
+
+# allowance
+components(mod_ets_allow.SSDI) %>% gg_season(season, label = "both")
+components(mod_ets_allow.SSI)  %>% gg_season(season, label = "both")
+components(mod_ets_allow.conc) %>% gg_season(season, label = "both")
+
+# allowance rate
+components(mod_ets_allowRate.SSDI) %>% gg_season(season, label = "both")
+components(mod_ets_allowRate.SSI)  %>% gg_season(season, label = "both")
+components(mod_ets_allowRate.conc) %>% gg_season(season, label = "both")
+
+
+
+
+# No. unemployment
+components(mod_ets_unemply) %>% gg_season(season, label = "both")
+
+# unemployment rate
+components(mod_ets_uRate) %>% gg_season(season, label = "both")
+
+# changes in unemployment
+components(mod_ets_dunemply) %>% gg_season(season, label = "both")
+
+# change rate of unemployement
+components(mod_ets_dlunemply) %>% gg_season(season, label = "both")
+
+
+## check decompostion
+components(mod_ets_SSDI) %>% autoplot()
+components(mod_ets_SSI)  %>% autoplot()
+components(mod_ets_conc) %>% autoplot()
+components(mod_ets_unemply) %>% autoplot()
+components(mod_ets_dlunemply) %>% autoplot()
+components(mod_ets_uRate) %>% autoplot()
+
+
+## convert additive seasonality to multiplicative seasonality
+# 
+components(mod_ets_dunemply) %>% 
+  mutate(season_mul = (dunemply_U - remainder) /  (dunemply_U - remainder - season)) %>% 
+  gg_season(season_mul, label = "both")
+
+
+# Try STL decomposition
+
+x <- 
+  df_model_AG %>% 
+  model(STL(Title.2 ~ trend() + season()))
+
+components(x) %>% autoplot
+
+components(x) %>% gg_season(season_year)
+
+
+```
+
+
+
+# Seasonal patterns using models, all states
+```{r}
+
+panel_ts <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+# panel_ts %>% names
+
+df_model <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, 
+                Title.2, Title.16, Concurrent, 
+                AllowRate.Title.2, AllowRate.Title.16, AllowRate.Concurrent,
+                Allow.Title.2, Allow.Title.16, Allow.Concurrent,
+                dlunemply_U, unemply_U, uRate_U) %>% 
+  mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
+  filter(date_yearmon <= yearmonth("2020-02")) %>% 
+  group_by(State) %>% 
+  mutate(dunemply_U  = unemply_U - dplyr::lag(unemply_U, 1),
+         disbApp_tot = Title.2 + Title.16 + Concurrent) 
+
+
+
+# Estimate ETS models for all variables and all states
+
+ets_fml_AA <- ~ error("A") + trend("Ad") + season("A")
+ets_fml_MM <- ~ error("M") + trend("Ad") + season("M")
+
+df_model %>% rename(y = "Title.2")
+
+mod_ets <- list(
+  
+  SSDI = df_model %>% rename(y = Title.2)    %>%  model(SSDI = ETS(update(ets_fml_MM, y~.))),
+  SSI  = df_model %>% rename(y = Title.16)   %>%  model(SSI  = ETS(update(ets_fml_MM, y~.))),
+  conc = df_model %>% rename(y = Concurrent) %>%  model(conc = ETS(update(ets_fml_MM, y~.))),
+  
+  allow.SSDI = df_model %>% rename(y = Allow.Title.2)    %>% model(allow.SSDI = ETS(update(ets_fml_MM, y~.))),
+  allow.SSI  = df_model %>% rename(y = Allow.Title.16)   %>% model(allow.SSI  = ETS(update(ets_fml_MM, y~.))),
+  allow.conc = df_model %>% rename(y = Allow.Concurrent) %>% model(allow.conc = ETS(update(ets_fml_MM, y~.))),
+
+  allowRate.SSDI = df_model %>% rename(y = AllowRate.Title.2) %>% model(allowRate.SSDI = ETS(update(ets_fml_MM, y ~.))),
+  allowRate.SSI  = df_model %>% rename(y = AllowRate.Title.16) %>% model(allowRate.SSI  = ETS(update(ets_fml_MM, y ~.))),
+  allowRate.conc = df_model %>% rename(y = AllowRate.Concurrent) %>% model(allowRate.conc = ETS(update(ets_fml_MM, y ~.))),
+
+  # number of unemployment
+  unemply = df_model %>% rename(y = unemply_U) %>% model(unemply = ETS(update(ets_fml_MM, y~.))),
+  # unemployment rate
+  uRate = df_model %>% rename(y = uRate_U) %>% model(uRate = ETS(update(ets_fml_MM,y~.))),
+  # level changes in unemployment 
+  dunemply = 
+    df_model %>%  
+    rename(y = dunemply_U) %>% 
+    filter(date_yearmon > yearmonth("2000-10")) %>% 
+    model(dunemply = ETS(update(ets_fml_AA, y~ .))),
+  
+  # % changes in unemployment 
+  dlunemply = 
+      df_model %>% 
+      rename(y = dlunemply_U) %>% 
+      filter(date_yearmon > yearmonth("2000-10")) %>% 
+      model(dlunemply = ETS(update(ets_fml_AA, y ~ .)))
+)
+
+# Components
+comp_ets <- plyr::llply(mod_ets, components)
+
+df_comp_ets <- bind_rows(comp_ets)
+
+df_comp_ets %<>% 
+  mutate(State = as.character(State),
+         State = ifelse(State =="AG", "US", State))
+
+# Function for making seasonal plots for a single state
+
+
+
+plot_season <- function(state_slc, df = df_comp_ets){
+
+# df = df_comp_ets 
+# state_slc = "US"
+
+df <- df %>% filter(date_yearmon > yearmonth("2000-10"))
+
+df_slc <- df %>% filter(State == state_slc)
+
+## Plotting seasonality
+
+fig_SSDI <- 
+  filter(df_slc, .model == "SSDI") %>%gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("SSDI only applications, ", state_slc)) 
+
+fig_SSI <- 
+  filter(df_slc, .model == "SSI") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("SSI only applications, ", state_slc)) 
+
+fig_conc <- 
+  filter(df_slc, .model == "conc") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL, y = "Seasonal component (M)",
+       title = paste0("Concurrent applications, ", state_slc)) 
+
+
+
+fig_allow.SSDI <- 
+  filter(df_slc, .model == "allow.SSDI") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("SSDI only allowances, ", state_slc)) 
+
+fig_allow.SSI <- 
+  filter(df_slc, .model == "allow.SSI") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("SSI only allowances, ", state_slc)) 
+
+fig_allow.conc <- 
+  filter(df_slc, .model == "allow.conc") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL, y = "Seasonal component (M)",
+       title = paste0("Concurrent allowances, ", state_slc)) 
+
+
+
+fig_allowRate.SSDI <- 
+  filter(df_slc, .model == "allowRate.SSDI") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.95, 1.05)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("SSDI only allowance rate, ", state_slc)) 
+
+fig_allowRate.SSI <- 
+  filter(df_slc, .model == "allowRate.SSI") %>% gg_season(season) + 
+   coord_cartesian(ylim = c(0.95, 1.05)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("SSI only allowance rate, ", state_slc)) 
+
+fig_allowRate.conc <- 
+  filter(df_slc, .model == "allowRate.conc") %>% gg_season(season) + 
+  coord_cartesian(ylim = c(0.95, 1.05)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL, y = "Seasonal component (M)",
+       title = paste0("Concurrent allowance rate, ", state_slc)) 
+
+
+fig_unemply <- 
+  filter(df_slc, .model == "unemply") %>%gg_season(season) + 
+  coord_cartesian(ylim = c(0.85, 1.15)) + geom_hline(yintercept = 1, linetype = 2) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("Unemployment, ", state_slc)) 
+
+fig_dlunemply <- 
+  filter(df_slc, .model == "dlunemply") %>%gg_season(season) + 
+  coord_cartesian(ylim = c(-0.15, 0.15)) + 
+  geom_hline(yintercept = 0, linetype = 2) + 
+  scale_y_continuous(labels = percent ) + 
+  labs(x = NULL,y = "Seasonal component (A)",
+       title = paste0("Monthly % change in unemployment (additive), ", state_slc)) 
+
+fig_dunemply <- 
+  filter(df_slc, .model == "dunemply") %>% gg_season(season) + 
+  labs(x = NULL,y = "Seasonal component (M)",
+       title = paste0("Monthly change in unemployment, ", state_slc)) 
+
+
+df_slc %>% 
+  filter(.model %in% c("SSDI", "unemply","dlunemply"),
+         year(date_yearmon) == 2019) %>% 
+  mutate(Month = month(date_yearmon),
+         season = ifelse(.model == "dlunemply", season, season - 1),
+         Var = factor(.model, levels = c("SSDI", "unemply", "dlunemply"),
+                              labels = c("SSDI", "unemployment", "chg unemployment"))) %>% 
+  ggplot(aes(x = Month, y = season, color = Var)) + 
+  geom_line() + 
+  geom_point() + 
+  scale_color_manual(values = c("red", "grey20", "grey70"))
+  
+
+fig_compare <- 
+  df_slc %>% 
+  group_by(.model) %>% 
+  filter(.model %in% c("SSDI", "unemply","dlunemply")) %>% 
+  mutate(Month = month(date_yearmon),
+         season = ifelse(.model == "dlunemply", season, season - 1),
+         season = ifelse(.model == "SSDI", season, dplyr::lag(season, 2) ),
+         Var = factor(.model, levels = c("SSDI", "unemply", "dlunemply"),
+                              labels = c("SSDI", "unemployment\n(2mth lag)", "chg unemployment\n(2mth lag)"))) %>% 
+  filter( year(date_yearmon) == 2019) %>% 
+  ggplot(aes(x = Month, y = season, color = Var)) + 
+  geom_line() + 
+  geom_point() +
+  scale_color_manual(values = c("red", "grey20", "grey70"))+
+  scale_x_continuous(breaks = 1:12) +
+  labs(x = NULL,y = "Seasonal component",
+       title = paste0("Comparing seasonal patterns, ", state_slc)) 
+  
+
+fig_all <- 
+  marrangeGrob(list(fig_SSDI, 
+                  fig_SSI, 
+                  fig_conc,
+                  
+                  fig_unemply,
+                  
+                  fig_allow.SSDI, 
+                  fig_allow.SSI, 
+                  fig_allow.conc, 
+                  
+                  fig_dlunemply,
+                  
+                  fig_allowRate.SSDI, 
+                  fig_allowRate.SSI, 
+                  fig_allowRate.conc,
+               
+                  fig_compare),
+                  ncol = 3, nrow = 4)
+
+}
+
+
+fig <- plot_season("US")
+
+states_order <- 
+df_model %>% 
+  as.data.frame %>% 
+  group_by(State) %>% 
+  summarise(totApp = sum(disbApp_tot)) %>% 
+  arrange(desc(totApp)) %>% 
+  mutate(state = as.character(State)) %>% 
+  pull(state)
+
+states_order <- c("US", setdiff(states_order, c("AG", "NW", "A9", "A8")))
+
+
+
+fig_season_allStates <- 
+  map(states_order, plot_season)
+# fig_season_allStates
+
+
+cairo_pdf(paste0("paper_plot/fig_explore/", "fig_patterns.pdf"), width = 30*0.7, height = 20*0.7, onefile = T)
+fig_season_allStates
+dev.off()
+
+
+
+# x %>% filter(.model == "SSDI", State == "AG")
+
+
+# marrangeGrob(list(fig_DI, fig_SSI, fig_concurrent), ncol = 3, nrow = 1)
+
+```
+
+
+
+
+
+
+# Counter factual analysis 
+
+```{r}
+
+# Function for plotting projected vs actual applications for three types, 
+# each in one plot
+
+panel_ts <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+
+df.test <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent) %>% 
+  mutate(across(c(Title.2, Title.16, Concurrent), as.numeric ))
+
+
+plot_counterFct <- function(state_slc){
+
+# state_slc <- "AG"
+  
+df.test.AG <- 
+  df.test %>% 
+  filter(State == state_slc,
+         date_yearmon <= yearmonth("2020-02"))
+
+# fit.AG <- 
+#   df.test.AG %>% 
+#   model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M"))
+#         )
+#report(fit.AG)# components(fit.AG) %>% 
+# autoplot
+
+
+fabletools::forecast(fit.AG, h = 14) %>% 
+  autoplot()
+
+
+
+# Producing forecasts using ETS
+fit.AG.DI <- 
+  df.test.AG %>% 
+  model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M")))
+
+
+fit.AG.SSI <- 
+  df.test.AG %>% 
+  model(ETS(Title.16  ~ error("M") + trend("Ad") + season("M")))
+
+fit.AG.concurrent <- 
+  df.test.AG %>% 
+  model(ETS(Concurrent  ~ error("M") + trend("Ad") + season("M")))
+
+
+fc.AG.DI         <- fabletools::forecast(fit.AG.DI, h = 14)
+fc.AG.SSI        <- fabletools::forecast(fit.AG.SSI, h = 14)
+fc.AG.concurrent <- fabletools::forecast(fit.AG.concurrent, h = 14)
+
+max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
+
+
+fig_DI <- 
+fc.AG.DI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.2), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") +
+  coord_cartesian(ylim = c(0, max_y)) + 
+  labs(title = paste0(state_slc, ": SSDI"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+  theme(legend.position = "bottom")
+
+fig_SSI <- 
+fc.AG.SSI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.16), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, max_y)) +
+  labs(title = paste0(state_slc, ": SSI"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+   theme(legend.position = "bottom")
+  
+fig_concurrent <- 
+fc.AG.concurrent %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Concurrent), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, max_y)) + 
+  labs(title = paste0(state_slc, ": Concurrent"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+   theme(legend.position = "bottom")
+
+
+marrangeGrob(list(fig_DI, fig_SSI, fig_concurrent), ncol = 3, nrow = 1)
+
+}
+
+
+fig_AG <- plot_counterFct("AG")
+fig_CA <- plot_counterFct("CA")
+fig_TX <- plot_counterFct("TX")
+fig_NY <- plot_counterFct("NY")
+fig_FL <- plot_counterFct("FL")
+fig_PA <- plot_counterFct("PA")
+fig_NC <- plot_counterFct("NC")
+fig_WI <- plot_counterFct("WI")
+
+
+cairo_pdf(paste0(plot.path, "counterFct1.pdf"), width = 20, height = 5.6, onefile = T)
+fig_AG
+fig_CA
+fig_TX
+fig_NY
+fig_FL
+fig_PA
+fig_NC
+fig_WI
+dev.off()
+
+
+# ggsave("text.pdf",  width = 10, height = 4, scale = 1.4)
+
+```
+
+
+
+# Describing seasonality with decomposition
+
+```{r}
+#    
+
+df.test %>% distinct(State)
+
+## seasonal plots:
+# Useful in identifying years in which the pattern changes
+df.test %>% 
+  filter(State =="AG") %>% 
+  gg_season(Title.2, labels = "both")
+
+
+## seasonal subplots
+# Useful in indentifying changes within particular seasons
+df.test %>% 
+  filter(State =="AG") %>% 
+  gg_subseries(Title.2)
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+# 1. Description of Seasonality in Applications and Unemployment 
+
+
+
+## Seasaon dummies for disability applications and unemployment
+
+```{r function_for_seasonal_dummies}
+
+seasonDummy = function(ts){
+# This function runs OLS regression of a selected series on seasonal dummies
+# using "lm" function. The coefficients are then tested using NeweWest autocorrelation
+# robust standard errors. The test result and adjusted R squared are reported.
+
+# Input
+  # ts: A time series (ts) object. 
+  
+# Output: A list with 4 elements
+  # Model: The regression model of the class lm
+  # test: The test result with NewyWest standard errors.
+  # R2: R squared
+  # R2adj: adjusted R squared. 
+  
+  month = factor(cycle(ts))
+  m = lm( ts ~ month - 1 )
+  test = coeftest(m, vcov = NeweyWest)
+  
+  result = list(model = m, test = test, R2 = summary(m)$r.squared, R2adj = summary(m)$adj.r.squared)
+  invisible(result)
+}
+
+```
+
+
+```{r Estimating_Seasonal_Dummies}
+
+end_select <- c(2020,2)
+
+variables = c("dlTotal","dlTitle.2", "dlTitle.16", "dlConcurrent", "dlunemply_U")
+
+dummyNW = t(sapply(variables, function(x){ m = seasonDummy(select(x, "AG", Panel))
+                                         c(R2 = m$R2, m$model$coef)}))
+
+
+Dummy.Total = data.frame(t(sapply(states52, function(x){m = seasonDummy(select("dlTotal", x, Panel, end = end_select  ))
+                                             c(R2 = m$R2, m$model$coef)})))
+Dummy.Title.2 = data.frame(t(sapply(states52, function(x){m = seasonDummy(select("dlTitle.2", x, Panel, end = end_select))
+                                             c(R2 = m$R2, m$model$coef)})))
+Dummy.Title.16 = data.frame(t(sapply(states52, function(x){m = seasonDummy(select("dlTitle.16", x, Panel, end = end_select))
+                                             c(R2 = m$R2, m$model$coef)})))
+Dummy.Concurrent = data.frame(t(sapply(states52, function(x){m = seasonDummy(select("dlConcurrent", x, Panel, end = end_select))
+                                             c(R2 = m$R2, m$model$coef)})))
+Dummy.unemploy   = data.frame(t(sapply(states52, function(x){m = seasonDummy(select("dlunemply_U", x, Panel, end = end_select))
+                                             c(R2 = m$R2, m$model$coef)})))
+
+Dummy.Total$State = rownames(Dummy.Total)
+Dummy.Title.2$State = rownames(Dummy.Title.2)
+Dummy.Title.16$State = rownames(Dummy.Title.16)
+Dummy.Concurrent$State = rownames(Dummy.Concurrent)
+Dummy.unemploy$State = rownames(Dummy.unemploy)
+
+Dummy.Total = MoveFront(Dummy.Total, c("State"))
+Dummy.Title.2 = MoveFront(Dummy.Title.2, c("State"))
+Dummy.Title.16 = MoveFront(Dummy.Title.16, c("State"))
+Dummy.Concurrent = MoveFront(Dummy.Concurrent, c("State"))
+Dummy.unemploy = MoveFront(Dummy.unemploy, c("State"))
+
+
+Dummy.Title.2 %>% arrange(R2) %>% head
+Dummy.Title.16 %>% arrange(R2) %>% head
+Dummy.Concurrent %>% arrange(R2) %>% head
+
+#save(Dummy.Total, Dummy.Title.2, Dummy.Title.16, Dummy.Concurrent)
+
+```
+
+
+```{r Plot_Seasonal_Dummies}
+
+plot.AppUnempLag = function(Data, region, type, Plot = TRUE){
+    ## Data must be one of the Dummy.XXXX data frames. 
+
+# Data = Dummy.Title.2
+# region = "AG"
+# type = "Total"
+
+DATA = data.frame( Application = as.numeric(Data[Data$State == region, paste0("month",1:12)]),
+                   Unemployment = as.numeric(Dummy.unemploy[Dummy.unemploy$State == region, paste0("month",1:12)][c(12,1:11)]),
+                   month = 1:12)
+DATA = melt(DATA, id = "month")
+
+AppUnempLag =  ggplot(DATA, aes(x = as.integer(month), y = value, colour = variable, linetype = variable)) + theme_bw() + 
+               geom_line(size = 0.6) + geom_point(size = I(2.5)) +
+               scale_color_manual(values=c("red", "blue"), labels = c(paste(type,"Applications"), "Unemployment(1 month Lag)")) + 
+               scale_linetype(labels = c(paste(type,"Applications"), "Unemployment(1 month Lag)")) + 
+               scale_x_continuous(breaks = 1:12, labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
+               labs(x = NULL, y = "Coefficients", colour = NULL, linetype = NULL) + 
+               theme(legend.justification=c(1,1), legend.position=c(0.99, 0.99))
+if(Plot) print(AppUnempLag)
+return(AppUnempLag)
+}
+
+AppUnempLag = plot.AppUnempLag(Dummy.Title.2, "AG", "Total")
+AppUnempLag
+
+# Figure 4
+cairo_pdf(paste0(plot.path, "apply&unemplyLag.pdf"), width = 10*0.8, height = 5*0.8)
+AppUnempLag
+dev.off()
+
+cairo_pdf(paste0(plot.path, "SeasonalDummies_AllStates.pdf"), width = 10, height = 5, onefile = T)
+  for(i in states52) print(plot.AppUnempLag(Dummy.Title.2, i, "DI", FALSE) + labs(title = i) + coord_cartesian(ylim=c(-0.2, 0.2)))
+dev.off()
+
+```
+
+
+```{r Boxplot}
+# Figure 5
+
+Dummy.all = rbind(cbind(Dummy.Title.2, type = "SSDI"), 
+                  cbind(Dummy.Title.16,type = "SSI"), 
+                  cbind(Dummy.Concurrent, type = "Concurrent"))
+Dummy.all = subset(Dummy.all, State %in% states50)
+Dummy.all$R2 = NULL
+
+Dummy.all = melt(Dummy.all, id = c("State", "type"))
+BoxplotDummy = ggplot(Dummy.all, aes(x = variable, y = value)) + theme_bw() + facet_wrap( ~ type , ncol = 1) + 
+               geom_boxplot(outlier.size = 1)+
+               geom_hline(yintercept = 0, linetype = 3, color = "blue", size = I(0.8)) + 
+               scale_x_discrete(labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) + 
+               labs(x = NULL, y = "Coefficients")
+BoxplotDummy
+
+cairo_pdf(paste0(plot.path, "BoxplotDummycoeff.pdf"), width = 8, height = 12, onefile = T)
+  BoxplotDummy  
+dev.off()
+
+
+```
+
+
+```{r Table_of_seasonal_dummies_for_nationawide}
+# Table 3
+
+dummyAG.table = rbind(cbind(Category = "SSDI",        subset(Dummy.Title.2,   State == "AG", paste0("month",1:12))),
+                      cbind(Category = "SSI",         subset(Dummy.Title.16,  State == "AG", paste0("month",1:12))),
+                      cbind(Category = "Concurrent",  subset(Dummy.Concurrent,State == "AG", paste0("month",1:12))),
+                      cbind(Category = "Unemployment",subset(Dummy.unemploy,  State == "AG", paste0("month",1:12)))
+                      )
+names(dummyAG.table) = c("Category", monthName)
+dummyAG.table
+
+print(xtable(dummyAG.table, caption = " Coefficients of Seasonal Dummies: Growth Rate of National Aggregate"))
+
+```
+
+
+```{r Table_of_R^2_for_top_5}
+# Table 2
+
+R2.table = merge( subset(Dummy.Title.2,  State %in% c("AG", top5), c("State","R2")),
+                  subset(Dummy.Title.16, State %in% c("AG", top5), c("State","R2")), by = "State")
+R2.table = merge( R2.table, subset(Dummy.Concurrent, State %in% c("AG", top5), c("State", "R2")), by = "State")
+
+names(R2.table) = c("State", "SSDI", "SSI", "Concurrent")
+
+R2.table$State = factor(R2.table$State, levels = c("AG","CA","TX","FL","NY","PA"))
+R2.table = R2.table[order(as.numeric(R2.table$State)), ]
+
+
+print(xtable(R2.table, caption = "Magnitudes of Seasonality in Disability Applications"))
+
+# For the in-line text
+Dummy.Title.2[Dummy.Title.2$State == "ND",]
+Dummy.Title.16[Dummy.Title.16$State == "ND",]
+Dummy.Concurrent[Dummy.Concurrent$State == "ND",]
+
+```
+
+
+```{r Table_of_R2_and_seasonal_dummies_for_top5}
+# For Table A1-A3 in appendix
+
+Dummy.table = function(Data, caption){
+  
+  tab = subset(Data, State %in% c("AG", top5))
+  names(tab) = c("State","R2", monthName )
+  tab$State = factor(tab$State, levels = c("AG","CA","TX","FL","NY","PA"))
+  tab = tab[order(as.numeric(tab$State)),]
+
+  xtab = xtable(tab, caption = caption)
+
+  print(xtab) 
+}
+
+Dummy.table(Dummy.Title.2, caption = "R2 and coefficients of seasonal dummies: SSDI (only) Applications")
+Dummy.table(Dummy.Title.16, caption = "R2 and coefficients of seasonal dummies: SSI (only) Applications")
+Dummy.table(Dummy.Concurrent, caption = "R2 and coefficients of seasonal dummies: Concurrent Applications")
+
+
+```
+
+
+## Testing for Heterogeneity
+
+```{r PYtest}
+source("Modeling.HeteroPYtestSeason.R")
+
+PanelDummy = cbind(Panel, dummy("Month",Panel)) 
+PYSeason.Title.2    = PYSeason.test("dlTitle.2", paste0("Month",1:12), 
+                                     cbind(Panel, dummy("Month",Panel)), states50)
+PYSeason.Title.16   = PYSeason.test("dlTitle.16", paste0("Month",1:12), 
+                                     cbind(Panel, dummy("Month",Panel)), states50)
+PYSeason.Concurrent = PYSeason.test("dlConcurrent", paste0("Month",1:12), 
+                                     cbind(Panel, dummy("Month",Panel)), states50)
+
+PYSeason.test = rbind( cbind(Category = "SSDI", PYSeason.Title.2[3,], PYSeason.Title.2[4,]),
+                       cbind(Category = "SSI" , PYSeason.Title.16[3,], PYSeason.Title.16[4,]),
+                       cbind(Category = "Concurrent", PYSeason.Concurrent[3,], PYSeason.Concurrent[4,]))
+names(PYSeason.test) = c("Category", "Dh", "p-value", "Dt", "p-value")
+
+PYSeason.test
+
+print(xtable(PYSeason.test))
+
+
+```
+
+
+## Plotting Application Series 
+
+```{r applicationSeries}
+# Figure 2
+
+AppSeries = subset(Panel_all, State == "AG", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+
+AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
+AppSeries = melt(AppSeries, id = "Formatted.Date")
+
+
+ThreeSeries = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
+              geom_line(size = 1 ) + 
+              geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
+              
+              scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
+              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+              labs(x = NULL, y = "Number of Applications", colour = NULL)+
+              theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
+ThreeSeries
+
+cairo_pdf(paste0(plot.path, "3series.pdf"), width = 10, height = 4.8, onefile = T)
+ThreeSeries
+dev.off()
+
+```
+
+
+## Frequency Domain Graphs
+
+```{r Coherence_Between_stochastic_Components}
+# Check the coherence between the series net of deterministic seasonality
+
+plot.coherence = function(region, category1, category2 = "dlunemply_U", title = ""){
+  
+  res.apply = ts(seasonDummy(select(category1, region, Panel))$model$res, s = c(2000,11), f = 12)
+  res.emply = ts(seasonDummy(select(category2, region, Panel))$model$res, s = c(2000,11), f = 12)
+  sRes = spec.pgram(cbind(res.apply, res.emply),
+                  #spans = c(5,5),
+                  kernel("daniell", c(3,3)),
+                  taper = 0, plot = FALSE, fast = F)
+  plot(sRes, plot.type = "coh", ci.lty = 2, main = title)
+  abline(v = 1:6, lty = 3)
+}
+
+plot.coherence("AG","dlTotal", "dlunemply_U", title = "Total")
+plot.coherence("AG","dlTitle.2", "dlunemply_U", title = "SSDI")
+plot.coherence("AG","dlTitle.16", "dlunemply_U", title = "SSI")
+plot.coherence("AG","dlConcurrent", "dlunemply_U", title = "Concurrent")
+
+
+cairo_pdf(paste0(plot.path, "coherenceNW.pdf"), width = 9, height = 3, onefile = T)
+  par(mfrow = c(1,3))
+  plot.coherence("NW","dlTitle.2", "dlunemply_U", title = "SSDI")
+  plot.coherence("NW","dlTitle.16", "dlunemply_U", title = "SSI")
+  plot.coherence("NW","dlConcurrent", "dlunemply_U", title = "Concurrent")
+dev.off()
+
+
+
+L = 19
+alpha = 0.05
+fvalue = qf(1- alpha, 2, 2*L-2)
+fvalue
+C = (fvalue/(L - 1 + fvalue))
+C
+
+qf(1-0.001, 2, 34)
+
+# library(seewave)
+# category1 = "dlTitle.16"; category2 = "dlunemply_U"; region = "NW"
+# res.apply = ts(seasonDummy(select(category1, region, Panel))$model$res, s = c(2000,11), f = 12)
+# res.emply = ts(seasonDummy(select(category2, region, Panel))$model$res, s = c(2000,11), f = 12)
+# 
+# x = cbind(res.apply, lag(res.emply, -1))
+# x = window(x, start = c(2000,12), end = c(2014,5))
+# x
+# coh(x[,1],x[,2])
+
+```
+
+
+## Seasonal Pattern in Month plots
+
+```{r seasonal_pattern}
+
+monthplot(select("dlTotal", "AG", Panel))
+monthplot(select("dlunemply_U", "AG", Panel))
+
+## Do recursive estimation of seasonal dummies. 
+
+```
+
+
+## Seasonal Pattern in Allowance Rate
+
+To do list with the allowance and allowance rate
+
+Allowance rate
+1. Regression on seasonal dummies, by application type and state. Output is dataframe and table 
+2. Plot the coefficients of allowance and application on the same plot. By type and state
+    - No lag
+    - 4th lag
+
+Application 
+1. Regression on seasonal dummies, by application type and state. Output is dataframe and table 
+
+
+ Main findings:
+  - Genrerally, the seasonality in allowance rates is much more moderate than that in application. 
+  - Suprisingly, the allowance rates have very similar seasonal pattern, although more moderate, to
+      the application series. According to SSA report, the determination process averagely take 131 days
+      (see Rutledge 2011,p16), which is approximately 4-5 months. Therefore if the peaks in applications do 
+      have effect (negative) on allowance rates, the seasonal pattern of allowance should show peaks in
+      June ~July(4-5 months after the Feb peak in application), and Dec~Jan(4-5 months after the Aug peak). 
+      None of them, however, shows up the the seasonal pattern in allowance rate. 
+  - The similarity between the seasonal patterns in application volume and allowanc rates may imply that 
+      there are some come common driving factor behind both of them, which are possibly related to some 
+      administrative process/issues. If this is the case, the the seasonality in allowance rate does not 
+      support the causal linkage between unemployment and application. 
+  - Next Step: Try to look at seasonality in application and allowance rate state by state, to see if there
+     is any relationship, which may be masked in the national level analysis.
+
+
+  - Nationalwide series, CA and PA series have steep downward trend in allowance rate, with a short - 
+    period of rebound in the middle of the sample. 
+  - NY and TX exhibits very different trend in allowance rates compared to other states, showing hump-shaped   
+      trend over the sample period.
+  - The allowance rates of 3 different types of applications in FL have different trends. 
+
+
+ Main findings from plots of applications vs allowance rate(4th lag)
+ 
+  - If we look at the contemporary relationship 
+     - Applications and allowance rate have very similar pattern in nationalwide series, which makes no sense if the seasonality in application is caused by unemployment. 
+     - However, the similarity is much less obvious in a state-by-state comparison. The common peaks in Feburary appear in most states, while only some of the states exhibit common peaks in August. For the top 5 states, allowance rates in CA, TX, NY, PA do not show siginificant increase in August, while FL does.  
+     
+ - If we look at application and 4th lag of allowance rate, 
+    - The negative relationship are more prominent at the begining and the end of the year. 
+    - The relationship in CA, TX, FL are more prominent.
+    
+ - It is still hard to tell which relationship is real. So far the evidence from the allowance rate is still quite weak.
+
+
+```{r seasonality_of_AllowRate, eval=FALSE, include=FALSE}
+
+Path <- paste0(plot.path,"/Allowance/")
+plot.path
+
+
+# Seasonal plots of national level allowance rates
+select("AllowRate.Total", "AG", Panel) %>% monthplot
+select("AllowRate.Title.2", "AG", Panel) %>% monthplot
+select("AllowRate.Title.16", "AG", Panel) %>% monthplot
+select("AllowRate.Concurrent", "AG", Panel) %>% monthplot
+
+
+cairo_pdf(paste0(Path, "/Allowance_Monthplot.pdf"), width = 10, height = 8, onefile = T)
+ par(mfrow = c(2,2))
+# Seasonal plots of first differenced allowance rates
+select("AllowRate.Total", "AG", Panel) %>% diff %>% monthplot(main = "dTotal")
+select("AllowRate.Title.2", "AG", Panel) %>% diff %>% monthplot(main = "dTitle.2")
+select("AllowRate.Title.16", "AG", Panel) %>% diff %>% monthplot(main = "dTitle.16")
+select("AllowRate.Concurrent", "AG", Panel) %>% diff %>% monthplot(main = "dConcurrent")
+dev.off()
+
+
+# Estimated Spectral plots of first differenced allowance rates
+cairo_pdf(paste0(Path, "/Allowance_Spectrum.pdf"), width = 10, height = 8, onefile = T)
+ par(mfrow = c(2,2))
+select("AllowRate.Total", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Total")
+select("AllowRate.Title.2", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Title.2")
+select("AllowRate.Title.16", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Title.16")
+select("AllowRate.Concurrent", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Concurrent")
+dev.off()
+
+i <- "CA"
+
+select("AllowRate.Total", i, Panel)     %>% monthplot
+select("AllowRate.Title.2", i, Panel)   %>% monthplot
+select("AllowRate.Title.16", i, Panel)  %>% monthplot
+select("AllowRate.Concurrent", i, Panel)%>% monthplot
+
+select("AllowRate.Total", i, Panel) %>% diff %>% monthplot
+select("AllowRate.Title.2", i, Panel) %>% diff %>% monthplot
+select("AllowRate.Title.16", i, Panel) %>% diff %>% monthplot
+select("AllowRate.Concurrent", i, Panel) %>% diff %>% monthplot
+
+
+```
+
+```{r Estimating_Seasonal_dummies_AllowRate}
+
+variables = c("AllowRate.Total","AllowRate.Title.2", "AllowRate.Title.16", "AllowRate.Concurrent")
+
+select("AllowRate.Total", "AG", Panel) %>% diff
+# x <- seasonDummy(select("AllowRate.Total", "CA", Panel) %>% diff); x$test[,"Pr(>|t|)"]
+
+
+
+dummyNW_Allow = t(sapply(variables, function(x){ m = seasonDummy(select(x, "AG", Panel) %>% diff)
+                                                 p.value <- m$test[,"Pr(>|t|)"]; names(p.value) <- paste0(names(p.value), ".p")
+                                                 c(R2 = m$R2, m$model$coef, p.value)}))
+
+Reg_allow <- function(x, type){
+  m <- seasonDummy(select(type, x, Panel) %>% diff)
+  R2 <- m$R2
+  Coeff <- m$model$coef
+  p.value <- m$test[,"Pr(>|t|)"]
+  names(p.value) <- paste0(names(p.value), ".p")
+  c(R2 = R2, Coeff, p.value)
+}
+
+Dummy_Allow.Total = data.frame(t(sapply(states52, Reg_allow, type = "AllowRate.Total" )))
+Dummy_Allow.Title.2 = data.frame(t(sapply(states52, Reg_allow, type = "AllowRate.Title.2")))
+Dummy_Allow.Title.16 = data.frame(t(sapply(states52, Reg_allow, type = "AllowRate.Title.16")))
+Dummy_Allow.Concurrent = data.frame(t(sapply(states52, Reg_allow, type = "AllowRate.Concurrent")))
+
+Dummy_Allow.Total$State = rownames(Dummy_Allow.Total)
+Dummy_Allow.Title.2$State = rownames(Dummy_Allow.Title.2)
+Dummy_Allow.Title.16$State = rownames(Dummy_Allow.Title.16)
+Dummy_Allow.Concurrent$State = rownames(Dummy_Allow.Concurrent)
+
+Dummy_Allow.Total = MoveFront(Dummy_Allow.Total, c("State"))
+Dummy_Allow.Title.2 = MoveFront(Dummy_Allow.Title.2, c("State"))
+Dummy_Allow.Title.16 = MoveFront(Dummy_Allow.Title.16, c("State"))
+Dummy_Allow.Concurrent = MoveFront(Dummy_Allow.Concurrent, c("State"))
+
+#save(Dummy.Total, Dummy.Title.2, Dummy.Title.16, Dummy.Concurrent)
+
+
+# Look at the R2 of allowance rates
+
+Dummy_Allow.Total %>% arrange(desc(R2)) %>% subset(select = c("State", "R2"))
+Dummy_Allow.Title.2 %>% arrange(desc(R2)) %>% subset(select = c("State", "R2"))
+Dummy_Allow.Title.16 %>% arrange(desc(R2)) %>% subset(select = c("State", "R2"))
+Dummy_Allow.Concurrent %>% arrange(desc(R2)) %>% subset(select = c("State", "R2"))
+
+Allow_R2 <- 
+cbind(
+Dummy_Allow.Total %>% subset(select = c("State", "R2")),
+Dummy_Allow.Title.2 %>% subset(select = c("R2")),
+Dummy_Allow.Title.16  %>% subset(select = c("R2")),
+Dummy_Allow.Concurrent %>% subset(select = c("R2"))
+)
+colnames(Allow_R2) <- c("State","Total", "DI", "SSI", "Concurrent")
+Allow_R2 %>% arrange(desc(Total))
+
+# R2 at national level is much higher than R2s at state level
+# At national level, DI has the highest R2 while SSI has the lowest
+# At state level, the pattern of R2 across the 3 types is not clear.
+
+
+
+# Look at the correlation between R2 of application and R2 of allowance rate
+which(Dummy_Allow.Total[,c("State")] == "AG")
+
+plot(Dummy_Allow.Total[-35, "R2"], Dummy.Total[-35, "R2"])
+plot(Dummy_Allow.Title.2[-35, "R2"], Dummy.Title.2[-35, "R2"])
+plot(Dummy_Allow.Title.16[-35,"R2"], Dummy.Title.16[-35, "R2"])
+plot(Dummy_Allow.Concurrent[-35,"R2"], Dummy.Concurrent[-35, "R2"])
+
+cor(Dummy_Allow.Total[-35,"R2"], Dummy.Total[-35, "R2"]) # 0.4247
+cor(Dummy_Allow.Title.2[-35,"R2"], Dummy.Title.2[-35, "R2"]) # 0.5077
+cor(Dummy_Allow.Title.16[-35,"R2"], Dummy.Title.2[-35, "R2"]) # 0.2778
+cor(Dummy_Allow.Concurrent[-35,"R2"], Dummy.Concurrent[-35, "R2"]) # 0.3538
+# DI has the hightest correlation while SSI has the lowest correlation.
+# But the correlation for all types is by no means strong. 
+
+
+```
+
+```{r State_by_State_Comparison_plots}
+# Comparing the seasonal dummies of application and allowance rate.
+
+# Figure 5
+
+plot_app <- function(data, i, type){
+  plot(as.numeric(subset(data, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, main = paste(i, type),
+       ylim = c(-0.2, 0.2), las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+}
+
+plot_allow <- function(data, i, type){
+  plot(as.numeric(subset(data, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, main = paste(i, type),
+       ylim = c(-0.02, 0.02),las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+}
+
+plot_double <- function(data1, data2, i, type, title = TRUE){
+  # Application and Allowance rate: contemporary
+  
+#   data1 <- Dummy.Total
+#   data2 <- Dummy_Allow.Total
+#   type <- "Total"
+
+ par(mar = c(3, 4, 4, 4) + 0.3)  
+  
+ plot(as.numeric(subset(data1, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, 
+       main = ifelse(title, paste(i, type), ""),
+       ylim = c(-0.2, 0.2), las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+
+ par(new = TRUE)
+
+ plot(as.numeric(subset(data2, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, lty =3, col = "red",
+       ylim = c(-0.02, 0.02), axes = FALSE)
+ axis(4, las = 1, col = "red")
+ legend("bottomleft", c("Application","Allowance Rate"), col = c("black", "red"), lty = c(1,3))
+ 
+}   # allowance rate no lag
+
+plot_double2 <- function(data1, data2, i, type, title = TRUE){
+  # application and 4th lag of allowance rate
+  
+ #   data1 <- Dummy.Total
+ #   data2 <- Dummy_Allow.Total
+ #   type <- "Total"
+  
+  par(mar = c(3, 4, 4, 4) + 0.3)  
+
+ plot(as.numeric(subset(data1, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, main = ifelse(title, paste(i, type), ""),
+       ylim = c(-0.2, 0.2), las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+
+ par(new = TRUE)
+
+ plot(as.numeric(subset(data2, State == i, select = c(paste0("month", 5:12), paste0("month", 1:4)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, lty =3, col = "red",
+       ylim = c(-0.02, 0.02), axes = FALSE)
+ axis(4, las = 1, col = "red")
+ legend("bottomleft", c("Application","Allowance Rate 4th lead"), col = c("black", "red"), lty = c(1,3))
+ 
+}  # 4th lag of allowance
+
+
+cairo_pdf(paste0(Path, "Allow_App_Dummies.pdf"), width = 16, height = 11, onefile = TRUE)
+# plot application and allowance rate(no lag) in seperate graphs
+par(mfrow = c(2,4))
+for(i in c(top10, states50[!states50 %in% top10])){
+# i = "TX"
+plot_app(Dummy.Total, i, "Total App")
+plot_app(Dummy.Title.2, i, "DI App")
+plot_app(Dummy.Title.16, i, "SSI App")
+plot_app(Dummy.Concurrent, i, "Concurrent App")
+
+plot_allow(Dummy_Allow.Total, i, "Total Allowance")
+plot_allow(Dummy_Allow.Title.2, i, "DI Allowance")
+plot_allow(Dummy_Allow.Title.16, i, "SSI Allowance")
+plot_allow(Dummy_Allow.Concurrent, i, "Concurrent Allowance")
+}
+par(mfrow = c(1,1))
+dev.off()
+
+
+cairo_pdf(paste0(Path, "Allow_App_Dummies2.pdf"), width = 16, height = 11, onefile = TRUE)
+par(mfrow = c(2,2))
+# plot application and allowance(no lag) rate in the same graph 
+
+for(i in c("AG", top10, states50[!states50 %in% top10])){
+# i = "TX"
+  
+plot_double(Dummy.Total, Dummy_Allow.Total, i, "Total")
+plot_double(Dummy.Title.2, Dummy_Allow.Title.2, i, "DI")
+plot_double(Dummy.Title.16, Dummy_Allow.Title.16, i, "SSI")
+plot_double(Dummy.Concurrent, Dummy_Allow.Concurrent, i, "Concurrent")
+}
+par(mfrow = c(1,1))
+dev.off()
+
+
+cairo_pdf(paste0(Path, "Allow_App_Dummies_4lag.pdf"), width = 16, height = 11, onefile = TRUE)
+par(mfrow = c(2,2))
+# plot application and allowance rate (4th lag) in the same graph 
+
+for(i in c("AG", top10, states50[!states50 %in% top10])){
+# i = "TX"
+  
+plot_double2(Dummy.Total, Dummy_Allow.Total, i, "Total")
+plot_double2(Dummy.Title.2, Dummy_Allow.Title.2, i, "DI")
+plot_double2(Dummy.Title.16, Dummy_Allow.Title.16, i, "SSI")
+plot_double2(Dummy.Concurrent, Dummy_Allow.Concurrent, i, "Concurrent")
+}
+par(mfrow = c(1,1))
+dev.off()
+
+#### Allowance plots for the paper
+
+# Figure 6
+# 1. National level, application against allowance rate of the same month, 3 categories
+cairo_pdf(paste0(Path, "Allow_App_Dummies_AG.pdf"), width = 8, height = 12, onefile = TRUE)
+par(mfrow = c(3,1))
+plot_double(Dummy.Title.2, Dummy_Allow.Title.2, "AG", "DI", F); title(main = "Seasonal Pattern of National Level SSDI Application and Allowance Rate")
+plot_double(Dummy.Title.16, Dummy_Allow.Title.16, "AG", "SSI", F); title(main = "Seasonal Pattern of National Level SSI Application and Allowance Rate")
+plot_double(Dummy.Concurrent, Dummy_Allow.Concurrent, "AG", "Concurrent", F); title(main = "Seasonal Pattern of National Level Concurent Application and Allowance Rate")
+
+par(mfrow = c(1,1))
+dev.off()
+
+# 2. National level, application against allowance rate(4 month leads), 3 categories
+cairo_pdf(paste0(Path, "Allow_App_Dummies4lead_AG.pdf"), width = 8, height = 12, onefile = TRUE)
+par(mfrow = c(3,1))
+plot_double2(Dummy.Title.2, Dummy_Allow.Title.2, "AG", "DI", F); title(main = "Seasonal Pattern of National Level SSDI Application and Allowance Rate")
+plot_double2(Dummy.Title.16, Dummy_Allow.Title.16, "AG", "SSI", F); title(main = "Seasonal Pattern of National Level SSI Application and Allowance Rate")
+plot_double2(Dummy.Concurrent, Dummy_Allow.Concurrent, "AG", "Concurrent", F); title(main = "Seasonal Pattern of National Level Concurent Application and Allowance Rate")
+
+par(mfrow = c(1,1))
+dev.off()
+
+
+
+```
+
+
+## Seasonal Pattern in number of allowance
+
+The number of allowance, at both national and state level, show very similar seasonal pattern to the pattern in application. 
+The similarity between them are greater than that between application and allowance rate. 
+
+
+```{r seasonality_of_Allowance}
+
+Path 
+
+# Seasonal plots of national level allowance rates
+select("Allow.Total", "AG", Panel) %>% monthplot
+select("Allow.Title.2", "AG", Panel) %>% monthplot
+select("Allow.Title.16", "AG", Panel) %>% monthplot
+select("Allow.Concurrent", "AG", Panel) %>% monthplot
+
+
+cairo_pdf(paste0(Path, "/AllowanceN_Monthplot.pdf"), width = 10, height = 8, onefile = T)
+ par(mfrow = c(2,2))
+# Seasonal plots of first differenced allowance rates
+select("Allow.Total", "AG", Panel) %>% diff %>% monthplot(main = "dTotal")
+select("Allow.Title.2", "AG", Panel) %>% diff %>% monthplot(main = "dTitle.2")
+select("Allow.Title.16", "AG", Panel) %>% diff %>% monthplot(main = "dTitle.16")
+select("Allow.Concurrent", "AG", Panel) %>% diff %>% monthplot(main = "dConcurrent")
+dev.off()
+
+
+# Estimated Spectral plots of first differenced allowance rates
+cairo_pdf(paste0(Path, "/AllowanceN_Spectrum.pdf"), width = 10, height = 8, onefile = T)
+ par(mfrow = c(2,2))
+select("Allow.Total", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Total")
+select("Allow.Title.2", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Title.2")
+select("Allow.Title.16", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Title.16")
+select("Allow.Concurrent", "AG", Panel) %>% diff %>% spec.pgram(span = c(4,4), main = "Concurrent")
+dev.off()
+
+i <- "CA"
+
+select("Allow.Total", i, Panel)     %>% monthplot
+select("Allow.Title.2", i, Panel)   %>% monthplot
+select("Allow.Title.16", i, Panel)  %>% monthplot
+select("Allow.Concurrent", i, Panel)%>% monthplot
+
+select("Allow.Total", i, Panel) %>% diff %>% monthplot
+select("Allow.Title.2", i, Panel) %>% diff %>% monthplot
+select("Allow.Title.16", i, Panel) %>% diff %>% monthplot
+select("Allow.Concurrent", i, Panel) %>% diff %>% monthplot
+
+
+```
+
+```{r Estimating_Seasonal_dummies_Allow}
+
+variables = c("Allow.Total","Allow.Title.2", "Allow.Title.16", "Allow.Concurrent")
+
+select("Allow.Total", "AG", Panel) %>% diff
+# x <- seasonDummy(select("Allow.Total", "CA", Panel) %>% diff); x$test[,"Pr(>|t|)"]
+
+
+
+dummyNW_AllowN = t(sapply(variables, function(x){ m = seasonDummy(select(x, "AG", Panel) %>% log %>% diff)
+                                                 p.value <- m$test[,"Pr(>|t|)"]; names(p.value) <- paste0(names(p.value), ".p")
+                                                 c(R2 = m$R2, m$model$coef, p.value)}))
+
+Reg_allowN <- function(x, type ){
+  m <- seasonDummy(select(type, x, Panel) %>% log %>%  diff)
+  R2 <- m$R2
+  Coeff <- m$model$coef
+  p.value <- m$test[,"Pr(>|t|)"]
+  names(p.value) <- paste0(names(p.value), ".p")
+  c(R2 = R2, Coeff, p.value)
+}
+
+Dummy_AllowN.Total = data.frame(t(sapply(states52, Reg_allowN, type = "Allow.Total" )))
+Dummy_AllowN.Title.2 = data.frame(t(sapply(states52, Reg_allowN, type = "Allow.Title.2")))
+Dummy_AllowN.Title.16 = data.frame(t(sapply(states52, Reg_allowN, type = "Allow.Title.16")))
+Dummy_AllowN.Concurrent = data.frame(t(sapply(states52, Reg_allowN, type = "Allow.Concurrent")))
+
+Dummy_AllowN.Total$State = rownames(Dummy_AllowN.Total)
+Dummy_AllowN.Title.2$State = rownames(Dummy_AllowN.Title.2)
+Dummy_AllowN.Title.16$State = rownames(Dummy_AllowN.Title.16)
+Dummy_AllowN.Concurrent$State = rownames(Dummy_AllowN.Concurrent)
+
+Dummy_AllowN.Total = MoveFront(Dummy_AllowN.Total, c("State"))
+Dummy_AllowN.Title.2 = MoveFront(Dummy_AllowN.Title.2, c("State"))
+Dummy_AllowN.Title.16 = MoveFront(Dummy_AllowN.Title.16, c("State"))
+Dummy_AllowN.Concurrent = MoveFront(Dummy_AllowN.Concurrent, c("State"))
+
+#save(Dummy.Total, Dummy.Title.2, Dummy.Title.16, Dummy.Concurrent)
+#Dummy_Allow.Total %>% fix
+
+
+```
+
+```{r State_by_State_Comparison_plots}
+# Comparing the seasonal dummies of application and allowance rate.
+
+plot_app <- function(data, i, type){
+  plot(as.numeric(subset(data, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, main = paste(i, type),
+       ylim = c(-0.2, 0.2), las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+}
+
+plot_allow <- function(data, i, type){
+  plot(as.numeric(subset(data, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, main = paste(i, type),
+       ylim = c(-0.2, 0.2),las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+}
+
+plot_double <- function(data1, data2, i, type, title = TRUE){
+  # Application and Allowance rate: contemporary
+  
+#   data1 <- Dummy.Total
+#   data2 <- Dummy_Allow.Total
+#   type <- "Total"
+
+ par(mar = c(3, 4, 4, 4) + 0.3)  
+  
+ plot(as.numeric(subset(data1, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, 
+       main = ifelse(title, paste(i, type), ""),
+       ylim = c(-0.2, 0.2), las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+
+ par(new = TRUE)
+
+ plot(as.numeric(subset(data2, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, lty =3, col = "red",
+       ylim = c(-0.2, 0.2), axes = FALSE)
+ axis(4, las = 1, col = "red")
+ legend("bottomleft", c("Application","Allowance"), col = c("black", "red"), lty = c(1,3))
+ 
+}   # allowance rate no lag
+
+plot_double2 <- function(data1, data2, i, type, title = TRUE){
+  # application and 4th lag of allowance rate
+  
+ #   data1 <- Dummy.Total
+ #   data2 <- Dummy_Allow.Total
+ #   type <- "Total"
+  
+  par(mar = c(3, 4, 4, 4) + 0.3)  
+
+ plot(as.numeric(subset(data1, State == i, select = c(paste0("month", 1:12)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, main = ifelse(title, paste(i, type), ""),
+       ylim = c(-0.2, 0.2), las = 1)
+  axis(1, at = 1:12)
+  abline(h = 0, lty = 3)
+
+ par(new = TRUE)
+
+ plot(as.numeric(subset(data2, State == i, select = c(paste0("month", 5:12), paste0("month", 1:4)))), 
+       type = "b", ylab = "", xlab = "", lwd = 2, lty =3, col = "red",
+       ylim = c(-0.2, 0.2), axes = FALSE)
+ axis(4, las = 1, col = "red")
+ legend("bottomleft", c("Application","Allowance 4th lead"), col = c("black", "red"), lty = c(1,3))
+ 
+}  # 4th lag of allowance
+
+
+cairo_pdf(paste0(Path, "AllowN_App_Dummies.pdf"), width = 16, height = 11, onefile = TRUE)
+# plot application and allowance rate(no lag) in seperate graphs
+par(mfrow = c(2,4))
+for(i in c(top10, states50[!states50 %in% top10])){
+# i = "TX"
+plot_app(Dummy.Total, i, "Total App")
+plot_app(Dummy.Title.2, i, "DI App")
+plot_app(Dummy.Title.16, i, "SSI App")
+plot_app(Dummy.Concurrent, i, "Concurrent App")
+
+plot_allow(Dummy_AllowN.Total, i, "Total Allowance")
+plot_allow(Dummy_AllowN.Title.2, i, "DI Allowance")
+plot_allow(Dummy_AllowN.Title.16, i, "SSI Allowance")
+plot_allow(Dummy_AllowN.Concurrent, i, "Concurrent Allowance")
+}
+par(mfrow = c(1,1))
+dev.off()
+
+
+
+
+cairo_pdf(paste0(Path, "AllowN_App_Dummies2.pdf"), width = 16, height = 11, onefile = TRUE)
+par(mfrow = c(2,2))
+# plot application and allowance(no lag) rate in the same graph 
+
+for(i in c("AG", top10, states50[!states50 %in% top10])){
+# i = "TX"
+  
+plot_double(Dummy.Total, Dummy_AllowN.Total, i, "Total")
+plot_double(Dummy.Title.2, Dummy_AllowN.Title.2, i, "DI")
+plot_double(Dummy.Title.16, Dummy_AllowN.Title.16, i, "SSI")
+plot_double(Dummy.Concurrent, Dummy_AllowN.Concurrent, i, "Concurrent")
+}
+par(mfrow = c(1,1))
+dev.off()
+
+
+cairo_pdf(paste0(Path, "AllowN_App_Dummies_4lag.pdf"), width = 16, height = 11, onefile = TRUE)
+par(mfrow = c(2,2))
+# plot application and allowance rate (4th lag) in the same graph 
+
+for(i in c("AG", top10, states50[!states50 %in% top10])){
+# i = "TX"
+  
+plot_double2(Dummy.Total, Dummy_AllowN.Total, i, "Total")
+plot_double2(Dummy.Title.2, Dummy_AllowN.Title.2, i, "DI")
+plot_double2(Dummy.Title.16, Dummy_AllowN.Title.16, i, "SSI")
+plot_double2(Dummy.Concurrent, Dummy_AllowN.Concurrent, i, "Concurrent")
+}
+par(mfrow = c(1,1))
+dev.off()
+
+#### 
+
+# 1. National level, application against allowance rate of the same month, 3 categories
+cairo_pdf(paste0(Path, "AllowN_App_Dummies_AG.pdf"), width = 8, height = 12, onefile = TRUE)
+par(mfrow = c(3,1))
+plot_double(Dummy.Title.2, Dummy_AllowN.Title.2, "AG", "DI", F); title(main = "Seasonal Pattern of National Level SSDI Application and Allowance")
+plot_double(Dummy.Title.16, Dummy_AllowN.Title.16, "AG", "SSI", F); title(main = "Seasonal Pattern of National Level SSI Application and Allowance")
+plot_double(Dummy.Concurrent, Dummy_AllowN.Concurrent, "AG", "Concurrent", F); title(main = "Seasonal Pattern of National Level Concurent Application and Allowance")
+
+par(mfrow = c(1,1))
+dev.off()
+
+# 2. National level, application against allowance rate(4 month leads), 3 categories
+cairo_pdf(paste0(Path, "AllowN_App_Dummies4lead_AG.pdf"), width = 8, height = 12, onefile = TRUE)
+par(mfrow = c(3,1))
+plot_double2(Dummy.Title.2, Dummy_AllowN.Title.2, "AG", "DI", F); title(main = "Seasonal Pattern of National Level SSDI Application and Allowance Rate")
+plot_double2(Dummy.Title.16, Dummy_AllowN.Title.16, "AG", "SSI", F); title(main = "Seasonal Pattern of National Level SSI Application and Allowance Rate")
+plot_double2(Dummy.Concurrent, Dummy_AllowN.Concurrent, "AG", "Concurrent", F); title(main = "Seasonal Pattern of National Level Concurent Application and Allowance Rate")
+
+par(mfrow = c(1,1))
+dev.off()
+
+
+
+```
+
+
+
+
+
+
+
+# 2. Relationship between seasonal components of disability applications and unemployment
+
+## Relatinship in Deterministic Seasonality 
+
+```{r seasonal_IV_Function}
+
+seasonalIV = function(region){
+  Title.2   = select("dlTitle.2",   region, Panel)
+  Title.16  = select("dlTitle.16",  region, Panel)
+  Concurrent= select("dlConcurrent",region, Panel)
+  unemploy  = select("dlunemply_U", region, Panel)
+  month = cycle(Title.2)
+  
+  DATA = cbind(Title.2 = Title.2, Title.16 = Title.16, Concurrent = Concurrent, 
+               unemploy = stats:::lag.default(unemploy, -1), month)
+
+  iv.Title.2   = ivreg(Title.2 ~   unemploy -1 | factor(month) -1, data = DATA )
+  iv.Title.16  = ivreg(Title.16 ~  unemploy -1 | factor(month) -1, data = DATA )
+  iv.Concurrent= ivreg(Concurrent~ unemploy -1 | factor(month) -1, data = DATA )
+  
+  output = data.frame(rbind(summary(iv.Title.2)$coefficients,
+                      summary(iv.Title.16)$coefficients,
+                      summary(iv.Concurrent)$coefficients))
+  
+  output = cbind(State = region, Category = c("SSDI","SSI","Concurrent"), output)
+  rownames(output) = NULL
+  output
+}
+
+```
+
+```{r seasonal_IV_Top5}
+
+# Table 5
+
+# Coefficient for nationawilde and top5 states
+seasonalIVTop5 = rbind(
+                       seasonalIV("AG"),
+                       seasonalIV("CA"),
+                       seasonalIV("TX"),
+                       seasonalIV("FL"),
+                       seasonalIV("NY"),
+                       seasonalIV("PA"))
+
+names(seasonalIVTop5) = c("State", "Category", "Estimate", "Std Error", "t", "p-value" )
+
+seasonalIVTop5
+
+print(xtable(seasonalIVTop5[,c("State","Category", "Estimate", "Std Error")], caption = "Relationship between deterministic seasonal components of DB application and 1 month lag of unemployment"))
+
+```
+
+```{r seasonal_IV_all_states}
+
+# Coefficient for nationawilde and top5 states
+
+seaIV_states <- alply(statesAll, 1, seasonalIV) %>% rbind.fill
+names(seaIV_states) = c("State", "Category", "Estimate", "Std Error", "t", "p.value" )
+
+library("dplyr")
+
+# number of states with sig coefficient for each type.
+seaIV_states %>% arrange(Category) %>%  group_by(Category) %>% filter(p.value <= 0.05) %>% summarise(n = n())
+
+# No. of states with coefficients of all 3 types sig
+seaIV_states %>% dplyr::select(State, Category, Estimate, p.value) %>% gather(key, value, -State, - Category) %>% 
+  dcast(State ~ Category + key) %>% filter(Concurrent_p.value <= 0.05, SSDI_p.value <= 0.05, SSI_p.value <= 0.05) # 15
+
+# Among the states above, No. of states in which the coefficient of SSDI is the highest. 
+seaIV_states %>% dplyr::select(State, Category, Estimate, p.value) %>% gather(key, value, -State, - Category) %>% 
+  dcast(State ~ Category + key) %>% 
+  filter(Concurrent_p.value <= 0.05, SSDI_p.value <= 0.05, SSI_p.value <= 0.05) %>%
+  filter(SSDI_Estimate > SSI_Estimate, SSDI_Estimate > Concurrent_Estimate) # 12
+  
+  
+  
+
+
+```
+
+
+```{r R2_of_application_against_R2_of_unemployment}
+
+
+Dummy_R2 <- data.frame(State = Dummy.Title.2$State,
+                       SSDI  = Dummy.Title.2$R2,
+                       SSI   = Dummy.Title.16$R2,
+                       Concurrent   = Dummy.Concurrent$R2,
+                       Unemployment = Dummy.unemploy$R2)
+# Correlation matrix
+cor(Dummy_R2[, -1])
+ # Correlation coefficients are quite low
+
+# Regression 
+summary(lm(SSDI ~ Unemployment, Dummy_R2))
+summary(lm(SSI ~ Unemployment, Dummy_R2))
+summary(lm(Concurrent ~ Unemployment, Dummy_R2))
+# none of the slope is significant.
+
+# Scatter Plot
+ggplot(Dummy_R2, aes(x = Unemployment, y = SSDI)) + geom_point()
+ggplot(Dummy_R2, aes(x = Unemployment, y = SSI))  + geom_point()
+ggplot(Dummy_R2, aes(x = Unemployment, y = Concurrent)) + geom_point()
+# No obvious relationship
+
+# Scatter Plot Top 10 states
+ggplot(subset(Dummy_R2, State %in% top10), aes(x = Unemployment, y = SSDI)) + geom_point()
+ggplot(subset(Dummy_R2, State %in% top10), aes(x = Unemployment, y = SSI))  + geom_point()
+ggplot(subset(Dummy_R2, State %in% top10), aes(x = Unemployment, y = Concurrent)) + geom_point()
+# No obvious relatioship, even slightly negative relationship. 
+
+```
+
+## Relationship in Stochastic Seasonality 
+
+```{r Stochastic_Seasonality}
+
+spec.pgram(select("dlTotal", "AG", Panel, na.rm = T), spans = c(4,4))
+abline(v = 1:6, lty = 3)
+
+spec.pgram(select("dlTitle.2", "AG", Panel, na.rm = T), spans = c(4,4))
+abline(v = 1:6, lty = 3)
+
+spec.pgram(select("dlTitle.16", "AG", Panel, na.rm = T), spans = c(4,4))
+abline(v = 1:6, lty = 3)
+
+
+
+spec.pgram(select("dlunemply_U", "AG", Panel, na.rm = T), span = c(4,4))
+abline(v = 1:6, lty = 3)
+
+
+res.apply = ts(seasonDummy(select("dlTitle.2", "AG", Panel, na.rm = T))$model$res, s = c(2000,11), f = 12)
+spec.pgram(res.apply, span = c(4,4))
+abline(v = 1:6, lty = 3)
+
+res.unemply = ts(seasonDummy(select("dlunemply_U", "AG", Panel, na.rm = T))$model$res, s = c(2000,11), f = 12)
+plot(spec.pgram(res.unemply, span = c(4,4), plot = F))
+abline(v = 1:6, lty = 3)
+
+
+Acf(res.apply)
+Acf(res.unemply, lwd = 3)
+```
+
+
+
+
+
+
+
+This document describes the seasonal patterns in U.S. Disability applications and unemployment by graphs and tables. 
+
+plot.Seasonal.R: Comparing Seasonal dummies of applications and unemployment
+
+plot.Heatmap.R: neater version of boxplot and heatmap of state series. 
+
+plot.paper graphs.R
+
+seasonalDummy.Rmd
+seasonalDummyPooled.Rmd
+seasonalIV.Rmd
+
+

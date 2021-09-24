@@ -8,7 +8,7 @@
 ## Data ----
 
 # Downloading the MOWL data
-#  - Data.download.R
+# source(Data.download.R)
 
 # Loading the processing MOLW data
 #  - Data.import.MOWL.R
@@ -24,11 +24,11 @@
 
 
 # Combine MOWL, employment and UI data
-#  - Data.Combine.R
+source("Data.Combine.R")
 
 
 # Detecting and correcting outliers in DI series
-#  - Data.outlier.R
+source("Data.outliers.R")
 
 
 
