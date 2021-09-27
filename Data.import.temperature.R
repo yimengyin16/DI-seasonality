@@ -38,11 +38,12 @@ df_temerature <-
   select(1:13) %>% 
   mutate(
     state_code = str_sub(X1, 1, 3), 
-    year       = str_sub(X1, -4, -1),
+    year       = str_sub(X1, -4, -1) %>% as.numeric,
     X1 = NULL
   ) %>% 
   gather(month, tempF, -state_code, -year) %>% 
-  mutate(month = as.numeric(str_extract(month, "\\d+")) - 1   )
+  mutate(month = as.numeric(str_extract(month, "\\d+")) - 1,
+         tempF = as.numeric(tempF))
 
 
 # Matching state code with state name ------------------------------------------
