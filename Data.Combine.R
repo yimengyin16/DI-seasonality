@@ -22,10 +22,11 @@
 
 source("General.R")
 
-load("Data/all.RData")
-load("Data/emply.RData")
-load("Data/data_UI_SSA.RData")
-load("Data/jobOpen.RData")
+(load("Data/all.RData"))
+(load("Data/emply.RData"))
+(load("Data/data_UI_SSA.RData"))
+(load("Data/jobOpen.RData"))
+(load("Data/data_emplyMon.RData")) # CES empllyment by industry and state
 
 
 data_UI_SSA <- 
@@ -34,15 +35,22 @@ data_UI_SSA <-
 data_jobOpen <- 
   dplyr::select(data_jobOpen, Cal.Year = year, Month = month, everything())
 
+data_emplyMon <- 
+  dplyr::select(data_emplyMon, Cal.Year = year, Month = month, everything())
 
-# x <- all0 %>% filter(Cal.Year == 2004, Month == 12)
-# x <- Panel %>% filter(Cal.Year == 2004, Month == 12)
 
+# emply$State %>% unique
+# data_UI_SSA$state %>% unique()
+# data_emplyMon$State %>% unique()
 
-Panel = merge(all0, all, by = c("State", "Cal.Year", "Month","Formatted.Date","Region","No.week","adj.factor"))
+# Note:
+# - All data frames should contains a group for national total with the name "AG". 
+
+Panel = merge(all0,  all, by = c("State", "Cal.Year", "Month","Formatted.Date","Region","No.week","adj.factor"))
 Panel = merge(Panel, emply, by = c("State", "Cal.Year", "Month"))
 Panel = merge(Panel, data_UI_SSA, by = c("State", "Cal.Year", "Month"), all.x = TRUE)
 Panel = merge(Panel, data_jobOpen, by = c("Cal.Year", "Month"), all.x = TRUE)
+Panel = merge(Panel, data_emplyMon, by = c("State", "Cal.Year", "Month"), all.x = TRUE)
 
 Panel = Panel[order(Panel$State, Panel$Cal.Year, Panel$Month), ] # make the order of months correct
 

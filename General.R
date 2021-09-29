@@ -644,7 +644,7 @@ rownames(usaw) <- states.usaww -> colnames(usaw) # Change row and column names
 usaw = usaw[states48,] # adjust the row order of the matrix. 
 
 
-dim(usaw)
+# dim(usaw)
 
 
 # Month names
@@ -652,14 +652,7 @@ monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
-# variance1 = aggregate(dlTitle.2 ~ State, data = reg.data, FUN = "var")
-# variance2 = aggregate(dlunemply_U ~ State, data = reg.data, FUN = "var")
-# plot(variance1[,2], variance2[,2])
-# summary(lm(variance1[,2] ~ variance2[,2]))
-# 
-# 
-# plot(dummy.Title16[4,], dummy.unemply[4,])
-
+regionNames <- c("SEA", "ATL", "DAL", "SFO", "DEN", "BOS", "PHL",  "KCM",  "CHI",  "NYC")
 
 
 

@@ -42,14 +42,6 @@ plot.path = "paper_plot/"
 dir.fig_newVer = "paper_plot/fig_newVer/"
 
 
-monthName = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-
-regionNames <- c("SEA", "ATL", "DAL", "SFO", "DEN", "BOS", "PHL",  "KCM",  "CHI",  "NYC")
-
-
-
-
 ## Data adjusted and unadjusted for outliers
 Panel %<>% mutate(State = as.character(State),
                   Region = as.character(Region),
@@ -59,7 +51,7 @@ Panel_unadj %<>% mutate(State = as.character(State),
                         Region = as.character(Region),
                         date_yearmon =  as.yearmon(Formatted.Date)) 
 
-
+Panel %>% names
 ## Adding regional totals for applications
 Panel_region <- 
   Panel %>% 
@@ -99,6 +91,14 @@ Panel_region <-
             jobOpenRate_u    = mean(jobOpenRate_u, na.rm = TRUE),
             jobOpenRate_s    = mean(jobOpenRate_s, na.rm = TRUE),
             
+            emplyMon_tot          = sum(emplyMon_tot,          na.rm = TRUE), 
+            emplyMon_construction = sum(emplyMon_construction, na.rm = TRUE),
+            emplyMon_gov          = sum(emplyMon_gov,          na.rm = TRUE),
+            emplyMon_leisure      = sum(emplyMon_leisure,      na.rm = TRUE),
+            emplyMon_mining       = sum(emplyMon_mining,       na.rm = TRUE),
+            emplyMon_trade        = sum(emplyMon_trade,        na.rm = TRUE),
+            
+            
             .groups = "drop"
             ) %>% 
   mutate(AllowRate.Title.2    = Allow.Title.2 / Det.Title.2,
@@ -106,13 +106,30 @@ Panel_region <-
          AllowRate.Concurrent = Allow.Concurrent / Det.Concurrent,
          lunemply_U = log(unemply_U),
          lunemply_S = log(unemply_S)
+         
          )
 
 
 Panel <- 
   bind_rows(Panel, 
             Panel_region) %>% 
-  as_tibble()
+  as_tibble() %>% 
+  mutate(emplyMon_high5   =  emplyMon_construction + emplyMon_mining + emplyMon_leisure + emplyMon_trade + emplyMon_gov,
+         emplyMon_modest2 =  emplyMon_mining + emplyMon_leisure,
+         emplyMon_modest4 =  emplyMon_mining + emplyMon_leisure + emplyMon_trade + emplyMon_gov,
+         
+         lemplyMon_tot          = log(emplyMon_tot), 
+         lemplyMon_construction = log(emplyMon_construction),
+         lemplyMon_gov          = log(emplyMon_gov),
+         lemplyMon_leisure      = log(emplyMon_leisure),
+         lemplyMon_mining       = log(emplyMon_mining),
+         lemplyMon_trade        = log(emplyMon_trade),
+         
+         lemplyMon_high5   =  log(emplyMon_high5),
+         lemplyMon_modest2 =  log(emplyMon_modest2),
+         lemplyMon_modest4 =  log(emplyMon_modest4)
+         )
+  
 
 
 
@@ -293,14 +310,45 @@ df_model <-
                 Allow.Title.2, Allow.Title.16, Allow.Concurrent,
                 lunemply_U, unemply_U, uRate_U,
                 UIIC, UICC,
-                jobOpen_u, jobOpenRate_u) %>% 
+                jobOpen_u, jobOpenRate_u,
+                emplyMon_tot,         
+                emplyMon_construction,
+                emplyMon_gov,         
+                emplyMon_leisure,     
+                emplyMon_mining,      
+                emplyMon_trade,
+                emplyMon_high5,  
+                emplyMon_modest2,
+                emplyMon_modest4,
+                lemplyMon_tot,         
+                lemplyMon_construction,
+                lemplyMon_gov,         
+                lemplyMon_leisure,     
+                lemplyMon_mining,      
+                lemplyMon_trade,
+                lemplyMon_high5,  
+                lemplyMon_modest2,
+                lemplyMon_modest4
+                ) %>% 
   mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
   filter(date_yearmon <= yearmonth("2020-02"),
          State != "DC") %>% 
   group_by(State) %>% 
   mutate(dlunemply_U = lunemply_U - dplyr::lag(lunemply_U, 1),
          dunemply_U  = unemply_U - dplyr::lag(unemply_U, 1),
-         disbApp_tot = Title.2 + Title.16 + Concurrent) 
+         disbApp_tot = Title.2 + Title.16 + Concurrent,
+         
+         dlemplyMon_tot          = lemplyMon_tot - dplyr::lag(lemplyMon_tot, 1),     
+         dlemplyMon_construction = lemplyMon_construction - dplyr::lag(lemplyMon_construction, 1),
+         dlemplyMon_gov          = lemplyMon_gov - dplyr::lag(lemplyMon_gov, 1),         
+         dlemplyMon_leisure      = lemplyMon_leisure  - dplyr::lag(lemplyMon_leisure, 1),     
+         dlemplyMon_mining       = lemplyMon_mining   - dplyr::lag(lemplyMon_mining, 1),      
+         dlemplyMon_trade        = lemplyMon_trade    - dplyr::lag(lemplyMon_trade, 1),
+         dlemplyMon_high5        = lemplyMon_high5    - dplyr::lag(lemplyMon_high5, 1),  
+         dlemplyMon_modest2      = lemplyMon_modest2  - dplyr::lag(lemplyMon_modest2, 1),
+         dlemplyMon_modest4      = lemplyMon_modest4  - dplyr::lag(lemplyMon_modest4, 1)
+         
+         ) 
 # Note DC is excluded because no UI data
 
 
@@ -312,7 +360,7 @@ ets_fml_MM <- ~ error("M") + trend("Ad") + season("M")
 
 
 mod_ets <- list(
-  
+
   SSDI = df_model %>% rename(y = Title.2)    %>%  model(SSDI = ETS(update(ets_fml_MM, y~.))),
   SSI  = df_model %>% rename(y = Title.16)   %>%  model(SSI  = ETS(update(ets_fml_MM, y~.))),
   conc = df_model %>% rename(y = Concurrent) %>%  model(conc = ETS(update(ets_fml_MM, y~.))),
@@ -342,14 +390,82 @@ mod_ets <- list(
       rename(y = dlunemply_U) %>%
       filter(date_yearmon > yearmonth("2000-10")) %>%
       model(dlunemply = ETS(update(ets_fml_AA, y ~ .))),
-  
+
   jobOpen     = df_model %>% rename(y = jobOpen_u)    %>% filter(date_yearmon >= yearmonth("2000-12")) %>% model(jobOpen = ETS(update(ets_fml_MM, y ~.))),
   jobOpenRate = df_model %>% rename(y = jobOpenRate_u)%>% filter(date_yearmon >= yearmonth("2000-12")) %>% model(jobOpenRate = ETS(update(ets_fml_MM, y ~.))),
-  
-  UIIC = df_model %>% rename(y = UIIC) %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
-  UICC = df_model %>% rename(y = UICC) %>% model(UICC = ETS(update(ets_fml_MM, y ~.)))
-)
 
+  UIIC = df_model %>% rename(y = UIIC) %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
+  UICC = df_model %>% rename(y = UICC) %>% model(UICC = ETS(update(ets_fml_MM, y ~.))),
+
+  # Constructing and mining data do not contain DE and HI
+  # mining data for FL starts in 2002-1
+
+  emplyMon_tot          = df_model %>% rename(y = emplyMon_tot)     %>% model(emplyMon_tot = ETS(update(ets_fml_MM, y ~.))),
+
+  emplyMon_gov          = df_model %>% rename(y = emplyMon_gov)     %>% model(emplyMon_gov = ETS(update(ets_fml_MM, y ~.))),
+  emplyMon_leisure      = df_model %>% rename(y = emplyMon_leisure) %>% model(emplyMon_leisure = ETS(update(ets_fml_MM, y ~.))),
+  emplyMon_trade        = df_model %>% rename(y = emplyMon_trade)   %>% model(emplyMon_trade = ETS(update(ets_fml_MM, y ~.))),
+
+  emplyMon_construction = df_model %>% rename(y = emplyMon_construction) %>%
+    filter(!State %in% c("DE", "HI")) %>%
+    model(emplyMon_construction = ETS(update(ets_fml_MM, y ~.))),
+
+  emplyMon_mining       = df_model %>% rename(y = emplyMon_mining)  %>%
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(emplyMon_mining = ETS(update(ets_fml_MM, y ~.))),
+
+  emplyMon_high5        = df_model %>% rename(y = emplyMon_high5)   %>%
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(emplyMon_high5 = ETS(update(ets_fml_MM, y ~.))),
+
+  emplyMon_modest2      = df_model %>% rename(y = emplyMon_modest2) %>%
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(emplyMon_modest2 = ETS(update(ets_fml_MM, y ~.))),
+
+  emplyMon_modest4      = df_model %>% rename(y = emplyMon_modest4) %>%
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(emplyMon_modest4 = ETS(update(ets_fml_MM, y ~.))),
+  
+  # Growth of employment by industry 
+  dlemplyMon_tot          = df_model %>% rename(y = dlemplyMon_tot) %>% filter(!is.na(y)) %>% model(dlemplyMon_tot = ETS(update(ets_fml_AA, y ~.))),
+ 
+  dlemplyMon_gov          = df_model %>% rename(y = dlemplyMon_gov) %>% filter(!is.na(y))     %>% model(dlemplyMon_gov = ETS(update(ets_fml_AA, y ~.))),
+  dlemplyMon_leisure      = df_model %>% rename(y = dlemplyMon_leisure) %>% filter(!is.na(y)) %>% model(dlemplyMon_leisure = ETS(update(ets_fml_AA, y ~.))),
+  dlemplyMon_trade        = df_model %>% rename(y = dlemplyMon_trade) %>% filter(!is.na(y))   %>% model(dlemplyMon_trade = ETS(update(ets_fml_AA, y ~.))),
+  
+  dlemplyMon_construction = df_model %>% rename(y = dlemplyMon_construction) %>%
+    filter(!is.na(y)) %>% 
+    filter(!State %in% c("DE", "HI")) %>%
+    model(dlemplyMon_construction = ETS(update(ets_fml_AA, y ~.))),
+  
+  dlemplyMon_mining       = df_model %>% rename(y = dlemplyMon_mining)  %>%
+    filter(!is.na(y)) %>% 
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(dlemplyMon_mining = ETS(update(ets_fml_AA, y ~.))),
+  
+  dlemplyMon_high5        = df_model %>% rename(y = dlemplyMon_high5)   %>%
+    filter(!is.na(y)) %>% 
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(dlemplyMon_high5 = ETS(update(ets_fml_AA, y ~.))),
+  
+  dlemplyMon_modest2      = df_model %>% rename(y = dlemplyMon_modest2) %>%
+    filter(!is.na(y)) %>% 
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(dlemplyMon_modest2 = ETS(update(ets_fml_AA, y ~.))),
+  
+  dlemplyMon_modest4      = df_model %>% rename(y = dlemplyMon_modest4) %>%
+    filter(!is.na(y)) %>% 
+    filter(!State %in% c("DE", "HI")) %>%
+    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    model(dlemplyMon_modest4 = ETS(update(ets_fml_AA, y ~.)))
+)
 
 
 # Components

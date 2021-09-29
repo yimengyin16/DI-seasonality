@@ -26,10 +26,9 @@
 #  - Data.import.UI.R
 
 
+# The following two must run together whenever data are updated
 # Combine MOWL, employment and UI data
 source("Data.Combine.R")
-
-
 # Detecting and correcting outliers in DI series
 source("Data.outliers.R")
 
