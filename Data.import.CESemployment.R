@@ -23,7 +23,6 @@ library(tidyr)
 
 
 
-
 ## Loading data ----
 
 fredr_set_key("2275862454ff25d4b5f50436d306736b")

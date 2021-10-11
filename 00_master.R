@@ -26,7 +26,7 @@
 #  - Data.import.UI.R
 
 
-# The following two must run together whenever data are updated
+## The following two must run together whenever data are updated
 # Combine MOWL, employment and UI data
 source("Data.Combine.R")
 # Detecting and correcting outliers in DI series
@@ -34,14 +34,23 @@ source("Data.outliers.R")
 
 
 
+## Producing results for the paper - new version ----
+# - newVer.Seasonality.Pattern(8).Rmd
+# - newVer.Seasonality.cause(4).Rmd
 
-## Producing results for the paper ----
+
+
+## Producing results for the paper - old version ----
 
 #  - Seasonality.Pattern.Rmd (w/ index for figures and tables)
 #  - Seasonality.SeasonUnroot.Rmd
 #  - Seasonality.Univariate_Granger.Rmd
 
 # - Paper_Seasonality.R. Not used 
+
+
+
+
 
 
 
