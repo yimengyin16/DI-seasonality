@@ -71,7 +71,7 @@ ls_ets <- readRDS("Data/intermed_ets.rds")
 
 # Prep 1: temperature 
 #   - calculate average monthly temperature from 2000-2020
-#   - output: 49 states excluding Hawaii, and national (48 contiguous states) (50 regions)
+#   - output: 49 states excluding Hawaii, and national (48 contiguous states) (50 regions in total)
 
 df_temp_monAvg <- 
   df_temerature %>% 
@@ -118,18 +118,40 @@ df_emplyInd %<>%
          emplyShare_farm         = emply_farm/ emply_Tot
          )
 
-df_emplyInd_share <- 
+# Average shares from 2000 to 2020
+df_emplyInd_share <-
   df_emplyInd %>% 
   filter(year %in% 2000:2020) %>% 
   group_by(State) %>% 
   summarise(across(starts_with("emplyShare"), ~ mean(.x, na.rm = TRUE)))
 
-df_emplyInd_share$State %>% unique() %>% length
+# df_emplyInd_share$State %>% unique() %>% length
 
 ```
 
 
-## Computing seasonal strength
+
+# Regression: strengh of seasonality
+
+This section explore the determinants of the strength of seasonality (measured by SD seasonal factor)
+
+We consider the following RHS variables:
+
+- Seasonal strength of unemployment 
+   - unemployment (unemply)
+   - or, dunemply, dlunemply
+- Temperature
+- Industrial structure measures
+  - share of construction
+  - share of highest 5
+  - share of modest 4
+  - share of farm
+
+In theory, the impact of industrial structure should be already reflected in the strength of unemployment 
+
+
+
+## - Computing seasonal strength
 
 ```{r include=FALSE}
 
@@ -160,7 +182,7 @@ df_emplyInd_share$State %>% unique() %>% length
 #      -  The second one is more appropriate to use in the regression analysis. (as did in GG(2018))
 
 # Outputs:
-#   - 50 states + national (US) + 10 SSA regions (61) 
+#   - 50 states + national (US) + 10 SSA regions (61 grps in total) 
 
 
 
@@ -204,10 +226,11 @@ df_seaStr <-
   
 
 ## Check if the two measures are correlated 
-x <- df_seaStr %>% 
-  group_by(.model) %>% 
-  summarise(str_corr = cor(seaStr_var, seaStr_gg))
-x
+# x <- df_seaStr %>% 
+#   group_by(.model) %>% 
+#   summarise(str_corr = cor(seaStr_var, seaStr_gg))
+# x
+
 # Modereate correlation for unemployment and UI
 # Little or week correlation for DI variables. 
 # Almost no correlation for DI applications.
@@ -221,27 +244,8 @@ x
 
 
 
-# Regression: strengh of seasonality
 
-This section explore the determinants of the strength of seasonality (measured by SD seasonal factor)
-
-We consider the following RHS variables:
-
-- Seasonal strength of unemployment 
-   - unemployment (unemply)
-   - or, dunemply, dlunemply
-- Temperature
-- Industrial structure measures
-  - share of construction
-  - share of highest 5
-  - share of modest 4
-  - share of farm
-
-
-In theory, the impact of industrial structure should be already reflected in the strength of unemployment 
-
-
-## Exploratory regressions, all states
+## - Exploratory regressions, all states
 
 ```{r}
 
@@ -520,7 +524,7 @@ df_reg_seaStr1 %>%
 ```
 
 
-## Exploratory regressions, large states and regions
+## - Exploratory regressions, large states and regions
 ```{r}
 # 
 df_reg_seaStr %>% 
@@ -569,7 +573,7 @@ df_reg_seaStr %>%
 
 # Regression: seasonal pattern (two peaks)
 
-## Constructing variables
+## - Constructing variables
 ```{r}
 
 # LHS vars: for SSDI, SDI, and conc
@@ -596,10 +600,12 @@ df_reg_pattern <-
     ls_ets$df_comp_ets %>% 
     filter(.model %in% c("SSDI", "SSI", "conc", "unemply", "dlunemply", "UIIC",
                          
+                         # employment: monthly level
                          "emplyMon_tot", "emplyMon_construction", "emplyMon_leisure",
                          "emplyMon_mining", "emplyMon_trade", "emplyMon_gov",
-                         "emplyMon_high5", "emplyMon_modest4", "employment_modest2",
+                         "emplyMon_high5",  "emplyMon_modest4", "employment_modest2",
                          
+                         # employment: monthly % change
                          "dlemplyMon_tot",    "dlemplyMon_construction", "dlemplyMon_leisure",
                          "dlemplyMon_mining", "dlemplyMon_trade",        "dlemplyMon_gov",
                          "dlemplyMon_high5",  "dlemplyMon_modest4",      "dlemployment_modest2"
@@ -660,7 +666,7 @@ df_reg_pattern1 <-
 ```
 
 
-# run regression: unemply and temperature
+# - run regression: unemply and temperature
 ```{r}
 
 # UI as a reference
@@ -675,7 +681,7 @@ df_reg_pattern1 %>%
 
 df_reg_pattern1 %>% 
    filter(!State %in% c("AK")) %>% 
-   lm(UIIC_s7 ~ dlunemply_s7 + tempF_7to8, data = .) %>% 
+   lm(UIIC_s7 ~ dlunemply_s7 + tempF_7to8, data = .) %>%  # robust to tempF 7, 8 or 7to8
    summary() 
 # result sensitive to MI, unemployment not significant once MI is removed
 # temperature is always significant, and positive (the warmer the more UI application)
@@ -734,7 +740,7 @@ df_reg_pattern1 %>%
 ```
 
 
-# run regression: industry specific employment and temperature
+# - run regression: industry specific employment and temperature
 ```{r}
 
 # Spring peak
@@ -796,7 +802,7 @@ df_reg_pattern1 %>%
    summary()
 
 # Mostly not sigificant, even for temperature, but RHS vars are joinly signficant (see F test)
-#  
+
 
 
 
@@ -805,9 +811,170 @@ df_reg_pattern1 %>%
 ```
 
 
+# Regression: seasonal pettern with all months
+
+LHS vars: for SSDI, SDI, and conc, and UIIC
+ - seasonal factors for all months and states as a single variable 
+
+RHS var
+- unemployment and employment, level and % change
+   - seasonal factors for all months and states, with lags
+- Temperature:
+   - avg temp in all months and all states
+- Industrial structure by state (same for all month)
+    - share of construction
+    - share of highest 5
+    - share of modest 4
+    - share of farm
 
 
 
+## - Constructing variables
+```{r}
+
+# LHS vars: for SSDI, SDI, and conc
+#  - Spring peak 1: seasonal factor in March
+#  - Spring peak 2: Avg seasonal factor from March to May
+#  - Auguest peak
+#  - pattern 1: Spring peak 1 / August peak
+#  - pattern 2: Spring peak 2 / August peak 
+
+# RHS var
+#  - unemployment:
+#     - seasonal factor in Dec, Jan, Feb, and July
+#  - Temperature:
+#     - avg temp in Jan and Feb
+#     - avg temp in July and Aug
+#  - Industrial structure
+#      - share of construction
+#      - share of highest 5
+#      - share of modest 4
+#      - share of farm
+
+df_reg_allmon <- 
+    ls_ets$df_comp_ets %>% 
+    filter(.model %in% c("SSDI", "SSI", "conc",  "UIIC",
+                         
+                         # unemployment: monthly level and % change
+                         "unemply", "dlunemply",
+                         
+                         # employment: monthly level
+                         "emplyMon_tot", "emplyMon_construction", "emplyMon_leisure",
+                         "emplyMon_mining", "emplyMon_trade", "emplyMon_gov",
+                         "emplyMon_high5",  "emplyMon_modest4", "employment_modest2",
+                         
+                         # employment: monthly % change
+                         "dlemplyMon_tot",    "dlemplyMon_construction", "dlemplyMon_leisure",
+                         "dlemplyMon_mining", "dlemplyMon_trade",        "dlemplyMon_gov",
+                         "dlemplyMon_high5",  "dlemplyMon_modest4",      "dlemployment_modest2"
+                         )) %>% 
+    as_tibble %>% 
+    filter(!is.na(season)) %>% 
+    mutate(month = month(date_yearmon)) %>% 
+    group_by(State, .model, month) %>% 
+    # average seasonal factors across years
+    summarise(season = mean(season, na.rm = TRUE), .groups = "drop_last") %>% 
+    spread(.model, season) 
+
+
+df_reg_allmon %<>% 
+  left_join(df_temp_monAvg %>% rename(month = Month), by = c("State", "month") ) %>% 
+  left_join(df_emplyInd_share,   by = "State") %>% 
+  ungroup
+
+
+# df_reg_allmon %>% names
+
+## create 1 and 2-month lags for all variables
+# append Nov and Dec values, with Nov as -1 and Dec as 0
+
+df_reg_allmon %<>% 
+  gather(Var, L0, -State, -month) 
+
+df_reg_allmon <- 
+ bind_rows(
+   df_reg_allmon,
+
+   df_reg_allmon %>% 
+     filter(month %in% c(11, 12)) %>% 
+     mutate(month = month - 12)
+) %>% 
+  arrange(Var, State, month)
+
+
+df_reg_allmon %<>% 
+  mutate(L1 = dplyr::lag(L0, 1), 
+         L2 = dplyr::lag(L0, 2)) %>% 
+  gather(nLag, valLag, -State, -month, -Var) %>% 
+  unite("Var", nLag, Var, sep = ".") %>% 
+  mutate(Var = str_remove(Var, "L0.")) %>% 
+  filter(month %in% 1:12) %>% 
+  spread(Var, valLag) %>% 
+  relocate(State, month, SSDI, SSI, conc, UIIC) %>% 
+   mutate(
+     seaQ_DI = case_when(
+       month %in% c(12, 1, 2)  ~ "Q4",
+       month %in% c(3, 4, 5)   ~ "Q1",
+       month %in% c(6, 7)      ~ "Q2.1",
+       month %in% c(8)         ~ "Q2.2",
+       month %in% c(9, 10, 11) ~ "Q3"
+     ),
+  
+     month = factor(month),
+     State = factor(State)
+          )
+
+
+df_reg_allmon_states <-  
+  df_reg_allmon %>% 
+  filter(State %in% state.abb)
+
+
+# df_reg_allmon %>% names
+
+
+```
+
+
+## - run regression
+
+```{r}
+
+# UI claims as a reference
+
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK")) %>% 
+   #lm(UIIC ~ dlemplyMon_tot+ L1.dlemplyMon_tot + tempF + tempF:month, data = .) %>% 
+   lm(UIIC ~ dlunemply:month + L1.dlunemply:month + L1.tempF:month, data = .) %>% 
+   summary()
+
+
+
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK")) %>% 
+   #lm(SSDI ~ L1.dlemplyMon_tot + L2.dlemplyMon_tot + L2.tempF + L2.tempF:month, data = .) %>% 
+   lm(SSDI ~ L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   summary()
+
+
+
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK")) %>% 
+   #lm(SSDI ~ dlemplyMon_tot+ L1.dlemplyMon_tot + tempF + tempF:month, data = .) %>% 
+   lm(SSI ~  L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   summary()
+
+
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK")) %>% 
+   #lm(SSDI ~ dlemplyMon_tot+ L1.dlemplyMon_tot + tempF + tempF:month, data = .) %>% 
+   lm(conc ~  L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   summary()
+
+
+
+
+```
 
 
 
