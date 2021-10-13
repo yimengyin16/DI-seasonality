@@ -826,30 +826,12 @@ RHS var
     - share of highest 5
     - share of modest 4
     - share of farm
-
+- Interaction with each month
 
 
 ## - Constructing variables
 ```{r}
 
-# LHS vars: for SSDI, SDI, and conc
-#  - Spring peak 1: seasonal factor in March
-#  - Spring peak 2: Avg seasonal factor from March to May
-#  - Auguest peak
-#  - pattern 1: Spring peak 1 / August peak
-#  - pattern 2: Spring peak 2 / August peak 
-
-# RHS var
-#  - unemployment:
-#     - seasonal factor in Dec, Jan, Feb, and July
-#  - Temperature:
-#     - avg temp in Jan and Feb
-#     - avg temp in July and Aug
-#  - Industrial structure
-#      - share of construction
-#      - share of highest 5
-#      - share of modest 4
-#      - share of farm
 
 df_reg_allmon <- 
     ls_ets$df_comp_ets %>% 
@@ -885,7 +867,7 @@ df_reg_allmon %<>%
 
 # df_reg_allmon %>% names
 
-## create 1 and 2-month lags for all variables
+## Create 1, 2 and 3-month lags for all variables
 # append Nov and Dec values, with Nov as -1 and Dec as 0
 
 df_reg_allmon %<>% 
@@ -896,7 +878,7 @@ df_reg_allmon <-
    df_reg_allmon,
 
    df_reg_allmon %>% 
-     filter(month %in% c(11, 12)) %>% 
+     filter(month %in% c(10, 11, 12)) %>% 
      mutate(month = month - 12)
 ) %>% 
   arrange(Var, State, month)
@@ -904,7 +886,8 @@ df_reg_allmon <-
 
 df_reg_allmon %<>% 
   mutate(L1 = dplyr::lag(L0, 1), 
-         L2 = dplyr::lag(L0, 2)) %>% 
+         L2 = dplyr::lag(L0, 2),
+         L3 = dplyr::lag(L0, 3)) %>% 
   gather(nLag, valLag, -State, -month, -Var) %>% 
   unite("Var", nLag, Var, sep = ".") %>% 
   mutate(Var = str_remove(Var, "L0.")) %>% 
@@ -912,19 +895,27 @@ df_reg_allmon %<>%
   spread(Var, valLag) %>% 
   relocate(State, month, SSDI, SSI, conc, UIIC) %>% 
    mutate(
-     seaQ_DI = case_when(
-       month %in% c(12, 1, 2)  ~ "Q4",
-       month %in% c(3, 4, 5)   ~ "Q1",
-       month %in% c(6, 7)      ~ "Q2.1",
-       month %in% c(8)         ~ "Q2.2",
-       month %in% c(9, 10, 11) ~ "Q3"
+     seaQ_DIa = case_when(
+       month %in% c(3, 4, 5)   ~ "Q1",    # Spring
+       month %in% c(6, 7, 8)   ~ "Q2",  # Summer 1: June, July
+       month %in% c(9, 10, 11) ~ "Q3",    # Fall
+       month %in% c(12, 1, 2)  ~ "Q4"     # Winter
      ),
+     
+     seaQ_DIb = case_when(
+       month %in% c(3, 4, 5)   ~ "Q1",    # Spring
+       month %in% c(6, 7)      ~ "Q2.1",  # Summer 1: June, July
+       month %in% c(8)         ~ "Q2.2",  # Summer 2:Aug
+       month %in% c(9, 10, 11) ~ "Q3",    # Fall
+       month %in% c(12, 1, 2)  ~ "Q4"     # Winter
+     ),
+     
   
      month = factor(month),
      State = factor(State)
           )
 
-
+# Keep states only
 df_reg_allmon_states <-  
   df_reg_allmon %>% 
   filter(State %in% state.abb)
@@ -936,40 +927,220 @@ df_reg_allmon_states <-
 ```
 
 
-## - run regression
+## - run regression: interation with each month
 
 ```{r}
 
-# UI claims as a reference
+library(broom)
+
+### UI claims
 
 df_reg_allmon_states %>% 
-   filter(!State %in% c("AK")) %>% 
-   #lm(UIIC ~ dlemplyMon_tot+ L1.dlemplyMon_tot + tempF + tempF:month, data = .) %>% 
+   filter(!State %in% c("AK", "MI")) %>% 
+   #lm(UIIC ~ dlunemply:month + L1.dlunemply:month + L1.tempF:month, data = .) %>% 
    lm(UIIC ~ dlunemply:month + L1.dlunemply:month + L1.tempF:month, data = .) %>% 
    summary()
 
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK", "MI")) %>% 
+   #lm(UIIC ~ dlunemply:month + L1.dlunemply:month + L1.tempF:month, data = .) %>% 
+   lm(UIIC ~ unemply:month + L1.unemply:month + tempF:month, data = .) %>% 
+   summary()
+
+#*
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK", "MI")) %>% 
+   #lm(UIIC ~ dlunemply:month + L1.dlunemply:month + L1.tempF:month, data = .) %>% 
+   
+   #lm(UIIC ~ unemply:month + L1.unemply:month + tempF:month, data = .) %>%  
+   lm(UIIC ~ unemply:month + tempF:month, data = .) %>% 
+   summary()
 
 
+# When using unemployment levels:
+#  No lag: (makes the most sense so far)
+#    - Unemployment: Nov~Apirl are sig
+#    - Temp: Summer(+) and winter(-) are sig, signs as expected, robut to using L0, L1
+#    - not sensitive to "AK", "MI"
+#  0-1 lag:
+#    - unemployment L0: Sig in winter and 4, 7, 9
+#    - unemployment L1: Mostly have negative signs. sig in winder and 4, 7, 9 
+#    - Temp: Summer(+) and winter(-) are sig, signs as expected, robut to using L0, L1
+
+# When using unemployment monthly changes
+#  Unemployment, winters and summers(less) are sig
+#  Temp: Summer(-) and winter(+), signs not expected.
+
+# Take away:
+#  - Employment has the biggest impact in winter and early spring
+#  - Temperature has the biggest impact on summer and winter
+
+
+
+### DI applications ----
+
+# Variations in model specs
+#  - level unemployment (preferred), monthly change unemployment
+#  - Lags: (L1 + L2), L1, L2
+#  - Interaction:
+#     - months
+#     - Seasons
+#     - Seasons, separate dummy for Aug 
+#  - Temprature: L1, L2
+#     - consider 2/3-month moving average temperature
+
+
+# SSDI
+#  interaction with each month
 df_reg_allmon_states %>% 
    filter(!State %in% c("AK")) %>% 
-   #lm(SSDI ~ L1.dlemplyMon_tot + L2.dlemplyMon_tot + L2.tempF + L2.tempF:month, data = .) %>% 
-   lm(SSDI ~ L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   mutate(seaQ_DI = seaQ_DIa) %>% 
+   # lm(SSDI ~ L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   # lm(SSDI ~ L1.unemply:month + tempF:month, data = .) %>% 
+   #lm(SSDI ~ L2.unemply:month,  data = .) %>% 
+   
+   #lm(SSDI ~ L1.unemply:month + tempF:month, data = .) %>% 
+   #lm(SSDI ~ L2.unemply:month + tempF:month, data = .) %>% 
+   lm(SSDI ~ L1.unemply:month + L2.unemply:month + tempF:month, data = .) %>% 
+   summary()
+
+## When only including 1-mon lag or 2-mon lag
+#   - Unemployment is sig in mon 2, 3, 4, 5 (spring), but not in Aug
+#   - Temperature: sig in mon 6, 7, 8 (summer),9, and in 12,1 (winter)
+#   - Robustness 
+#      - robust to using 1mon lag and 2mon lag of employment
+#      - robust to using 1 month lag or current month temperature. 
+#      - robust to including "AK" or not.
+
+## When including 1-mon and 2-mon lags
+#    - Employment coeffs are mostly not sig
+#    - Temperature coeffs are still sig in summer and winter. 
+#    - F-test, are 1mon and 2mon lags jointly sig? 
+#      - 1mon and 2mon lags are jointly sig for month 2~5. consistent with single lag 
+#        regression.
+#       https://bookdown.org/ccolonescu/RPoE4/further-inference-in-multiple-regression.html
+
+#  thoughts: employment condition is trigger of DI (SSDI/SSI) applications. 
+
+
+
+
+
+
+
+# SSDI interaction with seasons
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK")) %>% 
+   mutate(seaQ_DI = seaQ_DIb) %>% 
+   # lm(SSDI ~ L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   #lm(SSDI ~ L1.unemply:seaQ_DI + tempF:seaQ_DI, data = .) %>% 
+   #lm(SSDI ~ L1.unemply:seaQ_DI + L2.unemply:seaQ_DI + tempF:seaQ_DI, data = .) %>% 
+  
+   #lm(SSDI ~ L1.unemply:seaQ_DI, data = .) %>% 
+   lm(SSDI ~ L1.unemply:seaQ_DI + tempF:seaQ_DI, data = .) %>% 
+   summary()
+
+
+# Notes
+#  - including 1m and 2m lags can give confusing results, the impact of temparature 
+#    in summer and winter are signficiant.
+
+
+
+
+# SSI
+df_reg_allmon_states %>% 
+   filter(!State %in% c("AK")) %>% 
+   lm(SSI ~ L1.unemply:month + tempF:month, data = .) %>% 
+   #lm(SSI ~ L2.unemply:month + tempF:month, data = .) %>% 
+   #lm(SSI ~ L1.unemply:month + L2.unemply:month + L1.tempF:month, data = .) %>% 
    summary()
 
 
 
 df_reg_allmon_states %>% 
    filter(!State %in% c("AK")) %>% 
-   #lm(SSDI ~ dlemplyMon_tot+ L1.dlemplyMon_tot + tempF + tempF:month, data = .) %>% 
-   lm(SSI ~  L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
+   lm(conc ~ L1.unemply:month + tempF:month, data = .) %>% 
+   #lm(conc ~ L2.unemply:month + tempF:month, data = .) %>% 
+   #lm(conc ~ L1.unemply:month + L2.unemply:month + L1.tempF:month, data = .) %>% 
    summary()
 
 
-df_reg_allmon_states %>% 
-   filter(!State %in% c("AK")) %>% 
-   #lm(SSDI ~ dlemplyMon_tot+ L1.dlemplyMon_tot + tempF + tempF:month, data = .) %>% 
-   lm(conc ~  L1.dlunemply:month + L2.dlunemply:month + tempF:month, data = .) %>% 
-   summary()
+
+
+
+## F-test for joint sig of 1mon and 2mon lags
+
+H0 <- function(mon){
+  c1 <- paste0("L1.unemply:month", mon, "=0")
+  c2 <- paste0("month", mon, ":L2.unemply=0")
+  c(c1, c2)
+}
+
+H0_UIIC <- function(mon){
+  c1 <- paste0("unemply:month", mon, "=0")
+  c2 <- paste0("month", mon, ":L1.unemply=0")
+  c(c1, c2)
+}
+
+
+mod.UIIC <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK")) %>% 
+  lm(UIIC ~ unemply:month + L1.unemply:month + tempF:month, data = .)
+mod.UIIC %>% summary
+
+mod.SSDI <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK")) %>% 
+  lm(SSDI ~ L1.unemply:month + L2.unemply:month + tempF:month, data = .)
+
+mod.SSI <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK")) %>% 
+  lm(SSI ~ L1.unemply:month + L2.unemply:month + tempF:month, data = .)
+
+mod.conc <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK")) %>% 
+  lm(conc ~ L1.unemply:month + L2.unemply:month + tempF:month, data = .)
+
+summary(mod.SSDI)
+summary(mod.SSI)
+summary(mod.conc)
+#tidy(mod.SSDI)
+
+Ftest_UIIC <- map(1:12, function(x) linearHypothesis(mod.UIIC, H0_UIIC(x)))
+map_dfr(Ftest_UIIC, ~.x[2,])
+# consistent with model with 0 and 1 lages
+
+
+Ftest_SSDI <- map(1:12, function(x) linearHypothesis(mod.SSDI, H0(x)))
+map_dfr(Ftest_SSDI, ~.x[2,])
+
+
+Ftest_SSI <- map(1:12, function(x) linearHypothesis(mod.SSI, H0(x)))
+map_dfr(Ftest_SSI, ~.x[2,])
+
+
+Ftest_conc <- map(1:12, function(x) linearHypothesis(mod.conc, H0(x)))
+map_dfr(Ftest_conc, ~.x[2,])
+
+
+# Notes 
+#  - Spring and summer months are mostly sig. 
+#    - SSDI summer months:sig at 10%
+#    - All other: sig at 5%
+
+#  - Temperature(or vars it proxied) are still sig. 
+#    - The impact is large in summer (+), reinforce employoment 
+#    - The impact is neg in winter(-), when employment not sig
+#    - The impact is neg in spring(-), this offset employment
+
+
+## Overall conclusion
+#   - spring and summer peaks in DI applications are associated with unemployment
+#   - Winter trough (nov~jan) is more likely 
 
 
 
