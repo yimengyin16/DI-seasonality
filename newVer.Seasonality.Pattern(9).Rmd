@@ -60,7 +60,7 @@ Panel_region <-
   filter(!Region %in% c("AG", "NW", "A8", "A9")) %>% 
   group_by(Region, date_yearmon) %>% 
   summarise(State = unique(Region),
-            index = unique(index),
+            #index = unique(index),
             Cal.year = unique(Cal.Year),
             Month    = unique(Month),
             Formatted.Date = unique(Formatted.Date),
@@ -130,7 +130,14 @@ Panel <-
          lemplyMon_modest4 =  log(emplyMon_modest4)
          )
   
-
+## Adding index
+df_idx <- 
+  Panel_all %>% filter(State == "NW") %>% 
+  dplyr::select(date_yearmon) %>% 
+  mutate(index = 1:n())
+       
+Panel       <- left_join(Panel,       df_idx, by = "date_yearmon")
+Panel_unadj <- left_join(Panel_unadj, df_idx, by = "date_yearmon")
 
 
 #Panel
@@ -138,7 +145,7 @@ Panel_all <- Panel
 Panel     <- filter(Panel,date_yearmon <= "2020-2")
 
 Panel_unadj_all <- Panel_unadj
-Panel_unadj     <- filter(Panel,date_yearmon <= "2020-2")
+Panel_unadj     <- filter(Panel_unadj,date_yearmon <= "2020-2")
 
 
 # Key variables for the paper
@@ -200,14 +207,14 @@ Panel_unadj     <- filter(Panel,date_yearmon <= "2020-2")
 
 ```{r applicationSeries}
 # Figure 2
-# AG
-AppSeries = subset(Panel_all, State == "AG", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+# NW (including agencies)
+AppSeries = subset(Panel_all, State == "NW", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
 
 AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
 AppSeries = melt(AppSeries, id = "Formatted.Date")
 
 
-ThreeSeries.AG = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
+ThreeSeries.NW = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
               geom_line(size = 1 ) + 
               geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
               
@@ -216,7 +223,7 @@ ThreeSeries.AG = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = v
               labs(
                    x = NULL, y = "Number of Applications", colour = NULL)+
               theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
-ThreeSeries.AG
+ThreeSeries.NW
 
 
 plot_3series <- function(State_slc){
@@ -254,11 +261,11 @@ states_order0 <-
   mutate(state = as.character(State)) %>% 
   pull(state)
 
-states_order0 <- c(setdiff(states_order0, c("NW", "A9", "A8")))
+states_order0 <- c(setdiff(states_order0, c("A9", "A8")))
 
 
 threeSeries_large <- 
-  map(c("AG", "CA", "TX", "NY", "FL", "PA", "OH", "MI", "IL", "WI", "NC", "MN"), plot_3series)
+  map(c("NW", "AG", "CA", "TX", "NY", "FL", "PA", "OH", "MI", "IL", "WI", "NC", "MN"), plot_3series)
 
 threeSeries_ordered <- 
   map(c(states_order0), plot_3series)
@@ -266,19 +273,17 @@ threeSeries_ordered <-
 threeSeries_region <- 
   map(c(regionNames), plot_3series)
 
-
-
 # threeSeries_ordered[[1]]
 # threeSeries_large[[1]] 
 
 
 cairo_pdf(paste0(plot.path, "fig_explore/3series_large.pdf"), width = 10, height = 4.8, onefile = T)
-threeSeries_large 
+threeSeries_large
 dev.off()
 
 
 cairo_pdf(paste0(plot.path, "fig_explore/3series_ordered.pdf"), width = 10, height = 5.2, onefile = T)
-threeSeries_ordered 
+threeSeries_ordered
 dev.off()
 
 cairo_pdf(paste0(plot.path, "fig_explore/3series_regions.pdf"), width = 10, height = 5.2, onefile = T)
@@ -332,7 +337,9 @@ df_model <-
                 ) %>% 
   mutate(across(c(-State, -date_yearmon), as.numeric )) %>% 
   filter(date_yearmon <= yearmonth("2020-02"),
-         State != "DC") %>% 
+         #State != "DC"
+         !State %in% c(agencyNames, "FED")
+         ) %>% 
   group_by(State) %>% 
   mutate(dlunemply_U = lunemply_U - dplyr::lag(lunemply_U, 1),
          dunemply_U  = unemply_U - dplyr::lag(unemply_U, 1),
@@ -394,78 +401,101 @@ mod_ets <- list(
   jobOpen     = df_model %>% rename(y = jobOpen_u)    %>% filter(date_yearmon >= yearmonth("2000-12")) %>% model(jobOpen = ETS(update(ets_fml_MM, y ~.))),
   jobOpenRate = df_model %>% rename(y = jobOpenRate_u)%>% filter(date_yearmon >= yearmonth("2000-12")) %>% model(jobOpenRate = ETS(update(ets_fml_MM, y ~.))),
 
-  UIIC = df_model %>% rename(y = UIIC) %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
-  UICC = df_model %>% rename(y = UICC) %>% model(UICC = ETS(update(ets_fml_MM, y ~.))),
+  UIIC = df_model %>% rename(y = UIIC) %>%  filter(!State %in% c("DC", "NW")) %>% filter(!is.na(y))  %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
+  UICC = df_model %>% rename(y = UICC) %>%  filter(!State %in% c("DC", "NW")) %>% filter(!is.na(y))  %>% model(UICC = ETS(update(ets_fml_MM, y ~.))),
 
   # Constructing and mining data do not contain DE and HI
   # mining data for FL starts in 2002-1
 
-  emplyMon_tot          = df_model %>% rename(y = emplyMon_tot)     %>% model(emplyMon_tot = ETS(update(ets_fml_MM, y ~.))),
+  emplyMon_tot          = df_model %>% rename(y = emplyMon_tot)      %>%  filter(!State %in% c("NW", "DC"))  %>% model(emplyMon_tot = ETS(update(ets_fml_MM, y ~.))),
 
-  emplyMon_gov          = df_model %>% rename(y = emplyMon_gov)     %>% model(emplyMon_gov = ETS(update(ets_fml_MM, y ~.))),
-  emplyMon_leisure      = df_model %>% rename(y = emplyMon_leisure) %>% model(emplyMon_leisure = ETS(update(ets_fml_MM, y ~.))),
-  emplyMon_trade        = df_model %>% rename(y = emplyMon_trade)   %>% model(emplyMon_trade = ETS(update(ets_fml_MM, y ~.))),
+  emplyMon_gov          = df_model %>% rename(y = emplyMon_gov)      %>%  filter(!State %in% c("NW","DC"))  %>% model(emplyMon_gov = ETS(update(ets_fml_MM, y ~.))),
+  emplyMon_leisure      = df_model %>% rename(y = emplyMon_leisure)  %>%  filter(!State %in% c("NW","DC"))  %>% model(emplyMon_leisure = ETS(update(ets_fml_MM, y ~.))),
+  emplyMon_trade        = df_model %>% rename(y = emplyMon_trade)    %>%  filter(!State %in% c("NW", "DC"))  %>% model(emplyMon_trade = ETS(update(ets_fml_MM, y ~.))),
 
   emplyMon_construction = df_model %>% rename(y = emplyMon_construction) %>%
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     model(emplyMon_construction = ETS(update(ets_fml_MM, y ~.))),
 
   emplyMon_mining       = df_model %>% rename(y = emplyMon_mining)  %>%
-    filter(!State %in% c("DE", "HI")) %>%
-    filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
+    filter(!(State %in% c("FL", "DC") & date_yearmon < yearmonth("2002-01"))) %>%
     model(emplyMon_mining = ETS(update(ets_fml_MM, y ~.))),
 
   emplyMon_high5        = df_model %>% rename(y = emplyMon_high5)   %>%
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(emplyMon_high5 = ETS(update(ets_fml_MM, y ~.))),
 
   emplyMon_modest2      = df_model %>% rename(y = emplyMon_modest2) %>%
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(emplyMon_modest2 = ETS(update(ets_fml_MM, y ~.))),
 
   emplyMon_modest4      = df_model %>% rename(y = emplyMon_modest4) %>%
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(emplyMon_modest4 = ETS(update(ets_fml_MM, y ~.))),
   
   # Growth of employment by industry 
-  dlemplyMon_tot          = df_model %>% rename(y = dlemplyMon_tot) %>% filter(!is.na(y)) %>% model(dlemplyMon_tot = ETS(update(ets_fml_AA, y ~.))),
+  dlemplyMon_tot          = df_model %>% rename(y = dlemplyMon_tot) %>% filter(!is.na(y))  %>%  filter(!State %in% c("DC", "NW")) %>% model(dlemplyMon_tot = ETS(update(ets_fml_AA, y ~.))),
  
-  dlemplyMon_gov          = df_model %>% rename(y = dlemplyMon_gov) %>% filter(!is.na(y))     %>% model(dlemplyMon_gov = ETS(update(ets_fml_AA, y ~.))),
-  dlemplyMon_leisure      = df_model %>% rename(y = dlemplyMon_leisure) %>% filter(!is.na(y)) %>% model(dlemplyMon_leisure = ETS(update(ets_fml_AA, y ~.))),
-  dlemplyMon_trade        = df_model %>% rename(y = dlemplyMon_trade) %>% filter(!is.na(y))   %>% model(dlemplyMon_trade = ETS(update(ets_fml_AA, y ~.))),
+  dlemplyMon_gov          = df_model %>% rename(y = dlemplyMon_gov) %>% filter(!is.na(y))  %>%  filter(!State %in% c("DC", "NW"))     %>% model(dlemplyMon_gov = ETS(update(ets_fml_AA, y ~.))),
+  dlemplyMon_leisure      = df_model %>% rename(y = dlemplyMon_leisure) %>% filter(!is.na(y)) %>%  filter(!State %in% c("DC", "NW"))  %>% model(dlemplyMon_leisure = ETS(update(ets_fml_AA, y ~.))),
+  dlemplyMon_trade        = df_model %>% rename(y = dlemplyMon_trade) %>% filter(!is.na(y)) %>%  filter(!State %in% c("DC", "NW"))    %>% model(dlemplyMon_trade = ETS(update(ets_fml_AA, y ~.))),
   
   dlemplyMon_construction = df_model %>% rename(y = dlemplyMon_construction) %>%
     filter(!is.na(y)) %>% 
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     model(dlemplyMon_construction = ETS(update(ets_fml_AA, y ~.))),
   
   dlemplyMon_mining       = df_model %>% rename(y = dlemplyMon_mining)  %>%
     filter(!is.na(y)) %>% 
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(dlemplyMon_mining = ETS(update(ets_fml_AA, y ~.))),
   
   dlemplyMon_high5        = df_model %>% rename(y = dlemplyMon_high5)   %>%
     filter(!is.na(y)) %>% 
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(dlemplyMon_high5 = ETS(update(ets_fml_AA, y ~.))),
   
   dlemplyMon_modest2      = df_model %>% rename(y = dlemplyMon_modest2) %>%
     filter(!is.na(y)) %>% 
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(dlemplyMon_modest2 = ETS(update(ets_fml_AA, y ~.))),
   
   dlemplyMon_modest4      = df_model %>% rename(y = dlemplyMon_modest4) %>%
     filter(!is.na(y)) %>% 
-    filter(!State %in% c("DE", "HI")) %>%
+    filter(!State %in% c("DE", "HI", "DC", "NW")) %>%
     filter(!(State %in% c("FL") & date_yearmon < yearmonth("2002-01"))) %>%
     model(dlemplyMon_modest4 = ETS(update(ets_fml_AA, y ~.)))
 )
+
+# mod_ets[[3]] %>% components
+# 
+# x <- conc = df_model %>% rename(y = Concurrent) %>%  model(conc = ETS(update(ets_fml_MM, y~.)))
+# 
+# conc = df_model %>% rename(y = Concurrent) %>%  model(conc = ETS(update(ets_fml_MM, y~.)))
+# conc %>% components
+
+# fn <- function(modName) {
+#   df <- mod_ets[[modName]]
+#   data.frame(
+#   mod = modName,
+#   State = mod_ets[[1]]$State,
+#   Class = map_chr(mod_ets[[1]][[2]], class))
+# }
+# 
+# fn("SSDI")
+# 
+# x <- map_dfr(names(mod_ets), fn)
+# length(mod_ets)
+# 
+# x <- mod_ets[[16]]
+# x
 
 
 # Components
@@ -475,13 +505,15 @@ df_comp_ets <- bind_rows(comp_ets)
 
 df_comp_ets %<>% 
   mutate(State = as.character(State),
-         State = ifelse(State =="AG", "US", State))
+         State = ifelse(State =="AG", "US", State),
+         State = ifelse(State =="NW", "US+", State)
+         )
 
 ls_ets <- 
   list(
     Panel_all = Panel_all,
     Panel     = Panel,
-    mod_ets = mod_ets, 
+    mod_ets   = mod_ets, 
     df_comp_ets = df_comp_ets
 )
 
@@ -495,10 +527,15 @@ saveRDS(ls_ets, "Data/intermed_ets.rds")
 ## Plots of all states (exploratory)
 ```{r}
 
+# ls_ets <- readRDS("Data/intermed_ets.rds")
+# mod_ets <-  ls_ets$mod_ets
+# df_comp_ets <- ls_ets$df_comp_ets
+
+
 plot_season <- function(state_slc, df = df_comp_ets){
 
-#df = df_comp_ets
-#state_slc = "US"
+df = df_comp_ets
+state_slc = "US+"
 
 df <- df %>% filter(date_yearmon > yearmonth("2000-10"))
 
@@ -763,7 +800,7 @@ df_model %>%
   mutate(state = as.character(State)) %>% 
   pull(state)
 
-states_order <- c("US", setdiff(states_order, c("AG", "NW", "A9", "A8", regionNames)),
+states_order <- c("US", setdiff(states_order, c("AG", "NW", "A9", "A8", "DC", regionNames)),
                    intersect(states_order, regionNames)
                   )
 

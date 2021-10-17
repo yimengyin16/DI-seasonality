@@ -183,6 +183,7 @@ data_UI_NW <-
 
 data_UI_SSA <- 
 	bind_rows(data_UI_SSA,
+						mutate(data_UI_NW, state = "NW"),
 		        mutate(data_UI_NW, state = "AG"),
 						mutate(data_UI_NW, state = "A8"),
 						mutate(data_UI_NW, state = "A9")
