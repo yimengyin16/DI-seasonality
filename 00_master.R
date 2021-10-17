@@ -10,8 +10,8 @@
 # Downloading the MOWL data
 # source(Data.download.R)
 
-# Loading the processing MOLW data
-#  - Data.import.MOWL.R
+# Processing MOLW data
+#  - Data.import.MOWL(1).R
 
 # Loading and processing BLS (employment) data
 #  - Data.import.BLS.R
@@ -23,14 +23,18 @@
 #  - Data.import.CESemployment.R
 
 # Loading and processing UI data
-#  - Data.import.UI.R
+#  - Data.import.UI(1).R
+
+# Loading temperature data
+#  - Data.import.temperature.R
+
 
 
 ## The following two must run together whenever data are updated
 # Combine MOWL, employment and UI data
-source("Data.Combine.R")
+source("Data.Combine(2).R")
 # Detecting and correcting outliers in DI series
-source("Data.outliers.R")
+source("Data.outliers(2).R")
 
 
 

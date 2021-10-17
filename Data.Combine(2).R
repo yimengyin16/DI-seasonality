@@ -47,23 +47,25 @@ data_emplyMon <-
 # Note:
 # - All data frames should contains a group for national total with the name "AG". 
 
-Panel = merge(all0,  all, by = c("State", "Cal.Year", "Month","Formatted.Date","Region","No.week","adj.factor"))
-Panel = merge(Panel, emply, by = c("State", "Cal.Year", "Month"))
-Panel = merge(Panel, data_UI_SSA, by = c("State", "Cal.Year", "Month"), all.x = TRUE)
-Panel = merge(Panel, data_jobOpen, by = c("Cal.Year", "Month"), all.x = TRUE)
+#Panel$Formatted.Date %>% unique
+
+Panel = merge(all0,  all,           by = c("State", "Cal.Year", "Month","Formatted.Date","Region","No.week","adj.factor"), all.x = TRUE)
+Panel = merge(Panel, emply,         by = c("State", "Cal.Year", "Month"), all.x = TRUE)
+Panel = merge(Panel, data_UI_SSA,   by = c("State", "Cal.Year", "Month"), all.x = TRUE)
+Panel = merge(Panel, data_jobOpen,  by = c("Cal.Year", "Month"), all.x = TRUE)
 Panel = merge(Panel, data_emplyMon, by = c("State", "Cal.Year", "Month"), all.x = TRUE)
 
 Panel = Panel[order(Panel$State, Panel$Cal.Year, Panel$Month), ] # make the order of months correct
 
-Panel = Panel[Panel$State != "PR",]    # Remove Puerto Rico
+Panel = Panel[!Panel$State %in% c("PR", "GU"), ]    # Remove Puerto Rico and Guam
 Panel$State = factor(Panel$State)      # Redefine the factor levels
 
-# make the panel balanced. 
-Panel$index = 0
-for(i in levels(Panel$State)) Panel$index[Panel$State == i] = 1:nrow(Panel[Panel$State == i,])
-index.min = min(aggregate(index ~ State, data = Panel, max)[,2])
-Panel = Panel[Panel$index <= index.min, ]
-Panel = MoveFront(Panel, c("State", "index"))
+# make the panel balanced. (Not used)
+# Panel$index = 0
+# for(i in levels(Panel$State)) Panel$index[Panel$State == i] = 1:nrow(Panel[Panel$State == i,])
+# index.min = min(aggregate(index ~ State, data = Panel, max)[,2])
+#Panel = Panel[Panel$index <= index.min, ]
+Panel = MoveFront(Panel, c("State"))
 
 
 #Creating Log variables. 
@@ -83,7 +85,7 @@ Panel = transform(Panel,
                     )
 
 # Creating lags of log 
-
+{
 # Panel = pdata.frame(Panel, c("State","index"))
 # 
 # Panel$LlTotal       = lag(Panel$lTotal)
@@ -158,7 +160,7 @@ Panel = transform(Panel,
 # 
 # Panel = as.data.frame(Panel)
 # Panel$index = as.numeric(Panel$index)
-
+}
 
 ## Creating application series net of OLS seasonal dummies. 
 

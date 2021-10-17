@@ -1,18 +1,28 @@
 
 
-
-
-
 ## Notes
 # - Outliers of applications in 2004:6 and 2014:11 are adjusted in Data.import.MOWL.R
 # - This script 
 #     - detect and adjust outliers in DI application and allowance series
 #     - MI SSI 2004:5 and 2004:6 are adjusted properly by "tsoutlier", they are mannually adjusted
 
+## Regions adjusted
+#  - 50 states + DC (5 agencies are not adjusted) 
+#  - AG: sum of adjusted values of 50 states + DC
+#  - NW: sum of adjusted values of 50 states + DC + unadjusted values for 5 agencies)
+#
+## Variables adjusted:
+#  - number of apps
+#  - number of determination
+#  - number of allowance
+#
+## varibles updated:
+#  - allowance rates and log of applications are updated.
+
+
 
 ## Using method described in 
 # https://robjhyndman.com/hyndsight/tsoutliers/
-
 
 
 #*******************************************************************************
@@ -184,8 +194,8 @@ vars_adj <- c(
 ## Selecting variables to be adjusted for outliers
 df_adj <- 
 	Panel %>% 
-	select(State, index, date_yearmon, all_of(vars_adj)) %>% 
-	gather(Var, value, -(1:3)) %>% 
+	select(State, date_yearmon, all_of(vars_adj)) %>% 
+	gather(Var, value, -State, -date_yearmon) %>% 
 	group_by(State, Var) %>% 
 	mutate(value = as.numeric(value))
 
@@ -196,19 +206,19 @@ df_adj <-
 
 
 ## Check the number of outliers
-# df_outOnly  <- 
-# 	df_adj %>% 
+# df_outOnly  <-
+# 	df_adj %>%
 # 	filter(value != value_adjOut)
 # 
-# df_outOnly %>% 
+# df_outOnly %>%
 # 	filter(Var == "Title.2",
 # 				 date_yearmon <= as.yearmon("2020-02") # zoo
 # 				 )
 # 
-# df_outOnly_N <- 
-#   df_outOnly %>% 
+# df_outOnly_N <-
+#   df_outOnly %>%
 # 	filter(date_yearmon <= as.yearmon("2020-02")) %>%  # zoo
-# 	summarize(N = n()) %>% 
+# 	summarize(N = n()) %>%
 # 	arrange(Var, State)
  	
 
@@ -216,28 +226,51 @@ df_adj <-
 ## Adjusting outliers
 df_adj <-
   df_adj %>%
-	mutate(value = ifelse(date_yearmon <= as.yearmon("2020-02"), value_adjOut, value),
+	mutate(value = ifelse(date_yearmon > as.yearmon("2020-02") | (State %in% agencyNames), value, value_adjOut),
 				 value_adjOut = NULL)
 
 
 # df_adj %>% 
 # 	filter(State == "MI", Var == "Title.16", date_yearmon >= "2004-01")
+# df_adj$State %>% unique 
 
 
-## Mannually adjusting SSI in MI, 2004:05 and 2004:06
-df_adj <- 
-  df_adj %>% 
-	mutate(value = ifelse(State == "MI" & Var == "Title.16" & date_yearmon == "2004-05",
-												(value[State == "MI" & Var == "Title.16" & date_yearmon == "2003-05"] + 
-												 value[State == "MI" & Var == "Title.16" & date_yearmon == "2005-05"])/2, 
-												 value),
-				 value = ifelse(State == "MI" & Var == "Title.16" & date_yearmon == "2004-06",
-				 			          (value[State == "MI" & Var == "Title.16" & date_yearmon == "2003-06"] + 
-				 			  	       value[State == "MI" & Var == "Title.16" & date_yearmon == "2005-06"])/2, 
-				 			           value)
-				 )
 
 
+
+## Further adjusting SSI in MI, 2004:05 and 2004:06
+# Note 2021-10-17 
+#  -  It looks the outliers in MI has been corrected in the latest version 
+#     of the original data. 
+
+# df_adj %>% 
+# 	filter(State == "MI", 
+# 				 Var %in% c("Title.2", "Title.16", "Concurrent")) %>% 
+# 	ggplot(aes(x = date_yearmon, y = value, color = Var)) + 
+# 	geom_line()+
+# 	geom_vline(xintercept =  as.yearmon(c("2004-04", "2004-05")) )
+# 	
+# Panel_unadj %>% 
+# 	filter(State == "MI") %>% 
+# 	select(State, date_yearmon, Title.2) %>% 
+# 	ggplot(aes(x = date_yearmon, y =Title.2)) + 
+# 	geom_line()
+
+
+# Simple adjustment: average of the same month 1yr before and 1yr after
+# df_adj <-
+#   df_adj %>%
+# 	mutate(value = ifelse(State == "MI" & Var == "Title.16" & date_yearmon == "2004-05",
+# 												(value[State == "MI" & Var == "Title.16" & date_yearmon == "2003-05"] +
+# 												 value[State == "MI" & Var == "Title.16" & date_yearmon == "2005-05"])/2,
+# 												 value),
+# 				 value = ifelse(State == "MI" & Var == "Title.16" & date_yearmon == "2004-06",
+# 				 			          (value[State == "MI" & Var == "Title.16" & date_yearmon == "2003-06"] +
+# 				 			  	       value[State == "MI" & Var == "Title.16" & date_yearmon == "2005-06"])/2,
+# 				 			           value)
+# 				 )
+
+## Try applying the outlier adjustment procedture multiple times 
 
 
 ## National aggregate (AG: 50 states + DC, no PR)
@@ -246,23 +279,40 @@ df_adj <-
 bind_rows(
 
 df_adj %>% 
-	filter(!State %in% c("A8", "A9", "AG", "NW")) %>% 
-	mutate(State = as.character(State)),
+	filter(State %in% c(statesAll, agencyNames)) %>% 
+	# gather(Var, value, -State, -index, -date_yearmon) %>% 
+	mutate(State = as.character(State)) %>% 
+	ungroup %>% 
+	spread(Var, value),
+
 
 df_adj %>% 
-	filter(!State %in% c("A8", "A9", "AG", "NW")) %>% 
-	group_by(Var, index) %>% 
+	filter(State %in% statesAll) %>% 
+	#gather(Var, value, -State, -index, -date_yearmon) %>% 
+	group_by(Var, date_yearmon) %>% 
 	summarise(State = "AG",
 						date_yearmon = unique(date_yearmon),
 						value = sum(value, na.rm = TRUE)) %>% 
-	ungroup
+	ungroup %>% 
+	spread(Var, value),
+ 
+df_adj %>% 
+	filter(State %in% c(statesAll, agencyNames))  %>% 
+	# gather(Var, value, -State, -index, -date_yearmon) %>% 
+	group_by(Var, date_yearmon) %>% 
+	summarise(State = "NW",
+						date_yearmon = unique(date_yearmon),
+						value = sum(value, na.rm = TRUE)) %>% 
+	ungroup %>% 
+	spread(Var, value)
 )
 	
-df_adj <- 
-  df_adj %>% 
-	# select(-value_adjOut) %>% 
-	spread(Var, value)
+# df_adj <- 
+#   df_adj %>% 
+# 	# select(-value_adjOut) %>% 
+# 	spread(Var, value)
 
+# df_adj %>% filter(State == "AG")
 
 #*******************************************************************************
 ##  Combine adjusted and unadjusted variables and updating log and lag  ----
@@ -272,7 +322,7 @@ Panel <-
 left_join(df_adj,
 					Panel %>% select(-all_of(vars_adj)) %>% mutate(State = as.character(State))
 					) %>% 
-relocate(State, index, date_yearmon, Cal.Year, Month, Formatted.Date, Region, No.week, adj.factor) %>% 
+relocate(State, date_yearmon, Cal.Year, Month, Formatted.Date, Region, No.week, adj.factor) %>% 
 mutate(State = factor(State))
 
 
@@ -282,13 +332,19 @@ mutate(State = factor(State))
 
 
 
-#Creating Log variables. 
+#Creating Log variables, update allowance rates
 
 Panel = transform(Panel,  
 									lTotal      = log(Total),
 									lTitle.2    = log(Title.2),
 									lTitle.16   = log(Title.16),
-									lConcurrent = log(Concurrent)
+									lConcurrent = log(Concurrent),
+									
+									AllowRate.Total      = Allow.Total / Det.Total, 
+									AllowRate.Title.2    = Allow.Title.2 / Det.Title.2,
+									AllowRate.Title.16   = Allow.Title.16 / Det.Title.16,
+									AllowRate.Concurrent = Allow.Concurrent / Det.Concurrent
+									
 )
 
 # Creating lags of log 
@@ -347,6 +403,35 @@ Panel = transform(Panel,
 ##  Saving results  ----
 #*******************************************************************************
 save(Panel, Panel_unadj, file = "Data/Panel.RData")
+
+
+
+
+# Panel %>%
+# 	mutate(index = date_yearmon) %>%
+# 	filter(State %in% c("AG",  "NW")) %>%
+# 	select(State, index,
+# 				 Title.2, Title.16, Concurrent
+# 				 #Det.Title.2, Det.Title.16, Det.Concurrent,
+# 				 #AllowRate.Title.2, AllowRate.Title.16, AllowRate.Concurrent
+# 				 )  %>%
+# 	gather(Var, value, -State, -index) %>%
+# 	ggplot(aes(x = index, y =value, color = State)) + facet_grid(Var~.) +
+# 	geom_line() +
+# 	coord_cartesian(ylim = c(0, NA))
+# 
+# 
+# Panel %>%
+# 	mutate(index = date_yearmon) %>%
+# 	filter(State %in% agencyNames) %>%
+# 	#filter(State %in% "FE") %>%
+# 	select(State, index, Title.2, Title.16, Concurrent) %>%
+# 	gather(Var, value, -State, -index) %>%
+# 	ggplot(aes(x = index, y =value, color = State)) + facet_grid(Var~.) +
+# 	geom_line()
+
+
+
 
 
 

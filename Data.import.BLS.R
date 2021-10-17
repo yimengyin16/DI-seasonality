@@ -1,4 +1,5 @@
-# This program imports data from Bureau of Labor Statistics(BLS).
+# This program imports monthly employment/unemployment data from 
+#  Bureau of Labor Statistics(BLS).
 
 # This file generates a data file "emply.RData" containing a data frame "emply"
   # emply: Sesonally adjusted and unadjusted series of unemployment rate, -
@@ -18,16 +19,16 @@
 
 # Import employment statistics from Local Area Unemployment Statistics(LAUS).----------------
 
-# Last run on 6/13/2021
-# Data up to 04/2021
+# Last run on 10/15/2021
+# Data up to 08/2021
 # Import seasonally unadjusted series at state level
 # emplyU = read.table("http://download.bls.gov/pub/time.series/la/la.data.2.AllStatesU",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
 # # Import seasonally adjusted series at state level
 # emplyS = read.table("http://download.bls.gov/pub/time.series/la/la.data.3.AllStatesS",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-#
-# save(emplyU, emplyS, file = "Data/emplyData.RData")
+# 
+save(emplyU, emplyS, file = "Data/emplyData.RData")
 
 load("Data/emplyData.RData")
 
@@ -79,15 +80,16 @@ emply$State = as.factor(convertAbbr(emply$State))
 
 # Import national level employment statistics from CPS --------------------
 
-# Last run on 6/13/2021
-# Data up to 5/2021
+# Last run on 10/16/2021
+# Data up to 9/2021
 # CPSdata = read.table("http://download.bls.gov/pub/time.series/ln/ln.data.1.AllData",
 #                     header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-
-# CPSdata = read.table("C:\\Users\\yimen\\Google Drive\\AB_Projects_Personal\\Third_year\\Original Data\\ln.data.1.AllData.txt",
-#                     header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-
-#save(CPSdata, file = "Data/CPSdata.RData")
+# 
+##CPSdata = read.table("C:\\Users\\yimen\\Google Drive\\AB_Projects_Personal\\Third_year\\Original Data\\ln.data.1.AllData.txt",
+##                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
+# This will take a while to download
+#
+# save(CPSdata, file = "Data/CPSdata.RData")
  
 load("Data/CPSdata.RData")
 

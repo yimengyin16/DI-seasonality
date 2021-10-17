@@ -12,6 +12,13 @@
 #   - numbers in thousands
 #   - Constructing and mining data do not contain DE and HI 
 
+## Last updated:
+#   - download: 2021-10-16
+#   - data up to: 2021-09
+
+
+rm(list = ls())
+
 library(fredr)
 library(dplyr)
 library(lubridate)
@@ -66,7 +73,7 @@ get_UIdata <- function(key){
 		)
 }
 
-# 
+
 # data_tot_raw <-
 # 	purrr::map_dfr(var_names_tot, get_UIdata, .id = "State") %>%
 # 	mutate(VarName = "emplyMon_tot")

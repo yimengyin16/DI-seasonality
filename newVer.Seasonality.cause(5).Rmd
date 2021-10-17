@@ -909,7 +909,7 @@ map_dfr(Ftest_conc, ~.x[2,])
 ## Next steps:
 #   - Plot the results
 #   - The relative importance of employment and temperature 
-
+#   - Better standard errors? Clustered? 
 
 
 ```

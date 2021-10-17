@@ -11,9 +11,13 @@
 #  Data/emplyIndustry.R
 
 
+# Last updated: 
+#   - download: 2021-10-16
+#   - data up to: 2020
+
 
 # Packages and tools -----------------------------------------------------------
-
+rm(list = ls())
 source("General.R")
 library(bea.R)
 select <- dplyr::select

@@ -8,7 +8,11 @@
 #  "Data/data_UI_SSA.RData"
 
 
+## Last updated:
+#  - download:   2021-10-16
+#  - data up to: 2021-06-26
 
+rm(list = ls())
 library(fredr)
 library(dplyr)
 library(lubridate)
@@ -47,14 +51,14 @@ get_UIdata <- function(key){
 }
 
 # data_UI_IC_raw <-
-# 	purrr::map_dfr(var_names_IC, get_UIdata, .id = "state") %>% 
+# 	purrr::map_dfr(var_names_IC, get_UIdata, .id = "state") %>%
 # 	mutate(UItype = "IC")
 # 
 # data_UI_CC_raw <-
-# 	purrr::map_dfr(var_names_CC, get_UIdata, .id = "state") %>% 
+# 	purrr::map_dfr(var_names_CC, get_UIdata, .id = "state") %>%
 # 	mutate(UItype = "CC")
-
-# save(data_UI_IC_raw, 
+# 
+# save(data_UI_IC_raw,
 # 		 data_UI_CC_raw,
 # 		 file = paste0("Data/UI/", "data_raw_UIclaims.RData"))
 
@@ -71,7 +75,7 @@ data_UI <-
 	select(UItype, state, date, year, month, UI) 
 # data_UI
 
-data_UI %>% filter(year == 2004, month == 12)
+# data_UI %>% filter(year == 2004, month == 12)
 
 
 # data_UI %>% filter(state == "US") %>% select(date, year, value = UI) %>%
@@ -169,7 +173,7 @@ data_UI_SSA <-
 	arrange(state, year, month)
 # data_UI_SSA
 
-data_UI_SSA %>% filter(year == 2004, month == 12)
+#data_UI_SSA %>% filter(year == 2004, month == 12)
 # data_UI_SSA %>% filter(year == 2005, month == 1)
 
 
