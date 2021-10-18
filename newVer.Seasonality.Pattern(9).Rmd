@@ -215,15 +215,22 @@ AppSeries = melt(AppSeries, id = "Formatted.Date")
 
 
 ThreeSeries.NW = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
-              geom_line(size = 1 ) + 
+              geom_line(size = 0.5 ) + 
+              geom_point(size = 0.7)+
               geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
-              
+              coord_cartesian(ylim = c(0, 130000)) + 
               scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
-              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-8-1"))) + 
+              scale_y_continuous(breaks = seq(0, 200000, 20000), labels = comma) + 
               labs(
                    x = NULL, y = "Number of Applications", colour = NULL)+
               theme(legend.justification=c(0,1), legend.position=c(0.01,0.99))
 ThreeSeries.NW
+
+ggsave(ThreeSeries.NW, filename = "paper_plot/fig_newVer/ThreeSeries.NW.png",
+       width = 10, height = 4.8, scale = 0.8)
+
+
 
 
 plot_3series <- function(State_slc){
@@ -1059,9 +1066,10 @@ plot_season_avg <- function(slc){
   geom_line(linetype =2) + 
   geom_point(size = 2) + 
   geom_hline(yintercept = 1, color = "grey70") + 
-  coord_cartesian(ylim = c(0.85, 1.15)) + 
+  #coord_cartesian(ylim = c(0.85, 1.15)) + 
+  coord_cartesian(ylim = c(0.7, 1.35)) + 
   scale_x_continuous(breaks = 1:12, labels = month_lab) + 
-  scale_y_continuous(breaks = seq(0, 2, 0.05)) + 
+  scale_y_continuous(breaks = seq(0, 2, 0.1)) + 
   labs(title = slc,
        x = NULL,
        y = "Average seasonal factor (multiplicative)",
@@ -1070,8 +1078,8 @@ plot_season_avg <- function(slc){
         legend.position = c(0.9, 0.83) )
 }
 
-fig_season_avg_US <- plot_season_avg("US")
-  
+fig_season_avg_US <- plot_season_avg("US") + labs(title = NULL)
+fig_season_avg_NW <- plot_season_avg("US+") + labs(title = NULL)
 
 # 5 big states
 fig_season_avg_big6 <- 
@@ -1092,7 +1100,6 @@ ggsave(fig_season_avg_big6, filename = paste0(dir.fig_newVer, "fig_season_avg_bi
 
 
 ## Comparison figures: unemployment, DI and UI ----
-
 
 plot_season_avg_UIDI <- function(slc){  
   # slc = "US"
@@ -1162,12 +1169,46 @@ fig_UIDI_US <-
      grobs = plot_season_avg_UIDI("US"),
      nrow = 2,
      ncol = 1,
-     top = textGrob("US total")
+     top = textGrob(NULL)
      )
 
 fig_UIDI_US
 
-ggsave(fig_UIDI_US, filename = paste0(dir.fig_newVer, "fig_season_UIDI_UL.png"), width = 7 , height = 7)
+ggsave(fig_UIDI_US, filename = paste0(dir.fig_newVer, "fig_season_UIDI_US.png"), width = 7 , height = 7)
+
+
+
+## Checking seasonality in job openning 
+
+df_season_avg$.model %>% unique
+
+  fig_jobOpenRate <- 
+  df_season_avg %>% 
+  filter(State  %in% "US",
+        .model %in% c("jobOpenRate")
+        ) %>% 
+  # mutate(.model = factor(.model, 
+  #                        c("unemply", "UIIC"), 
+  #                        c("Unemployment", "UI initial claim"))) %>% 
+  arrange(.model) %>% 
+  ggplot(aes(x = Month, y = season_avg)) + theme_bw() + 
+  geom_line(linetype =2) + 
+  geom_point(size = 2) +
+  geom_hline(yintercept = 1, color = "grey70") +
+  coord_cartesian(ylim = c(0.7, 1.35)) +
+  scale_x_continuous(breaks = 1:12, labels = month_lab) +
+  scale_y_continuous(breaks = seq(0, 2, 0.1)) +
+  #scale_color_manual(values = c("black", "red")) +
+  labs(title = "Seasonal pattern of job opening rate",
+       x = NULL,
+       y = "Average seasonal factor (multiplicative)",
+       color = NULL) 
+  # theme(legend.position = "bottom",
+  #       legend.position = c(0.72, 0.87) )
+
+  
+ggsave(fig_jobOpenRate, filename = paste0(dir.fig_newVer, "fig_season_avg_jobOpenRate.png"),
+       width = 8, height = 4.5)
 
 
 ```
@@ -1221,12 +1262,11 @@ plot_season_avg_allow <- function(slc){
 
 fig_season_allow_US <- plot_season_avg_allow("US")
 
-ggsave(fig_season_allow_US, filename = paste0(dir.fig_newVer, "fig_season_avg_allow.png"), width = 7.1 , height = 8.4, dpi = 300 )
+ggsave(fig_season_allow_US, filename = paste0(dir.fig_newVer, "fig_season_avg_allow.png"), width = 7.1 , height = 8.4, dpi = 300)
 
 
 
 ```
-
 
 
 
@@ -1368,10 +1408,9 @@ fit_concurrent <- filter(mod_ets$conc, State == "AG")$conc[[1]]
 
 #%>% fabletools::forecast(h = 14)
 
-
-fcst_SSDI         <- fabletools::forecast(fit_SSDI, h = 14)
-fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 14)
-fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 14)
+fcst_SSDI       <- fabletools::forecast(fit_SSDI, h = 18)
+fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 18)
+fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 18)
 
 # max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
 
@@ -1383,7 +1422,7 @@ autoplot(fcst_SSDI,
          date_yearmon <= yearmonth("2020-02"),
          date_yearmon >= yearmonth("2018-01")) %>% 
   mutate(y = Title.2) %>% 
-  update_tsibble(key = NULL)) + 
+  update_tsibble(key = NULL)) + theme_bw() + 
   geom_line(aes(x = date_yearmon, y = Title.2), 
             data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
             color = "red") + 
@@ -1405,7 +1444,7 @@ fig_fcst_SSI <-
            date_yearmon >= yearmonth("2018-01")) %>% 
     mutate(y = Title.16) %>% 
   update_tsibble(key = NULL)
-  ) + 
+  ) + theme_bw() + 
   geom_line(aes(x = date_yearmon, y = Title.16), 
             data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
             color = "red") + 
@@ -1426,7 +1465,7 @@ autoplot(fcst_concurrent,
            date_yearmon >= yearmonth("2018-01")) %>% 
     mutate(y = Concurrent) %>% 
   update_tsibble(key = NULL)
-  ) + 
+  ) + theme_bw() + 
   geom_line(aes(x = date_yearmon, y = Concurrent), 
             data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
             color = "red") + 
@@ -1453,7 +1492,7 @@ ggsave(fig_fcast_DI_US, filename = paste0(dir.fig_newVer, "fig_counterFct_US.png
 
 
 
-## How Covid affected DI seasonality
+## How Covid affected DI seasonality v1: use average seasonal factor from forecast
 
 df_covid <-
   panel_ts %>% 
@@ -1487,7 +1526,7 @@ fig_counterFct_season <-
   geom_line(linetype = 5) +
   geom_point() + 
   geom_hline(yintercept = 1, color = "grey 80") + 
-  scale_color_manual(values = c("red", "blue")) + 
+  scale_color_manual(values = c("blue", "red")) + 
   labs(x = NULL,
        y = "Seasonal factor (multiplicative)",
        color = NULL) + 
@@ -1499,6 +1538,70 @@ ggsave(fig_counterFct_season, filename = paste0(dir.fig_newVer, "fig_counterFct_
 
 
 
+## How Covid affected DI seasonality v2: use estimated seasonal factor from the model
+
+df_covid <-
+  panel_ts %>% 
+  filter(State == "AG", date_yearmon >= yearmonth("2020-03")) %>% 
+  dplyr::select(State, date_yearmon, SSDI = Title.2, SSI = Title.16, Concurrent = Concurrent ) %>% 
+  update_tsibble(key = NULL)
+
+
+df_covid2 <- 
+  df_covid %>% 
+  gather(Var, value, -State, -date_yearmon) %>% 
+  filter(date_yearmon >= yearmonth("2020-05")) %>% 
+  as_tibble %>% 
+  group_by(Var) %>% 
+  mutate(avg = mean(value, na.rm = TRUE),
+         season_actual = value / avg,
+         DIType = str_extract(Var, "SSDI|SSI|Concurrent"),
+         Month = month(date_yearmon)) %>% 
+  ungroup() %>% 
+  select(DIType, Month,date_yearmon , season_actual)
+
+
+df_season_mod <- 
+  df_season_avg %>% 
+  filter(State == "US",
+         .model %in% c("SSDI", "SSI", "conc")
+  ) %>% 
+  rename(season_model = season_avg,
+         DIType = .model) %>% 
+  ungroup %>% 
+  mutate(DIType = ifelse(DIType == "conc", "Concurrent", DIType),
+         State   = NULL)
+
+df_covid2 <- 
+  left_join(df_covid2, df_season_mod, by = c("Month", "DIType")) %>% 
+  gather(VarType, season, -DIType, -Month, -date_yearmon) %>% 
+  mutate(DIType = str_extract(DIType, "SSDI|SSI|Concurrent"),
+         DIType = factor(DIType, c("SSDI", "SSI", "Concurrent"),
+                                 c("SSDI only", "SSI only", "Concurrent")),
+         VarType = factor(VarType, c("season_model", "season_actual"), 
+                                   c("Model", "Actual"))
+         )
+
+
+
+
+fig_counterFct_season2 <- 
+  df_covid2  %>% 
+  ggplot(aes(x = date_yearmon, y = season, color = VarType)) + theme_bw() + 
+  facet_grid(~DIType) + 
+  geom_line(linetype = 5) +
+  geom_point() + 
+  geom_hline(yintercept = 1, color = "grey 80") + 
+  scale_color_manual(values = c("grey50", "red")) + 
+  coord_cartesian(ylim = c(0.78, 1.22)) +
+  labs(x = NULL,
+       y = "Seasonal factor",
+       color = NULL) + 
+  theme(legend.position = "bottom")
+fig_counterFct_season2
+
+ggsave(fig_counterFct_season2, filename = paste0(dir.fig_newVer, "fig_counterFct_season2_US.png"), 
+       width = 12, height = 4.6)
 
 ```
 
