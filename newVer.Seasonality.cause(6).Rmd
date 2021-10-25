@@ -33,6 +33,9 @@ options(xtable.include.rownames = F,
         xtable.booktabs = T,
         xtable.caption.placement = "top")
 
+options(dplyr.print_max = 50)
+options(tibble.print_max = 50, tibble.print_min = 50)
+
 source("General.R")
 select <- dplyr::select
 
@@ -199,11 +202,35 @@ df_seaStr_var <-
   as_tibble %>% 
   filter(!is.na(remainder), !is.na(season)) %>% 
   group_by(State, .model) %>% 
-  summarise(var_SR = pop.var(season + remainder, na.rm = TRUE),
-            var_R  = pop.var(remainder, na.rm = TRUE),
+  summarise(var_SR = pop.var(season * (1 + remainder), na.rm = TRUE),
+            var_R  = pop.var( log(1 + remainder), na.rm = TRUE),
+            
+            var_LBR = pop.var(y / season, na.rm = TRUE),
+            var_y   = pop.var(y, na.rm = TRUE),
+            
+            # log version
+            var_lnSR = pop.var(log(season) + log(1 + remainder), na.rm = TRUE),
+            var_lnR  = pop.var( log(1 + remainder), na.rm = TRUE),
+            
+            var_lnLBR = pop.var(log(y) - log(season), na.rm = TRUE),
+            var_lny   = pop.var(log(y), na.rm = TRUE),
+            
+            
+            
             .groups = "drop") %>% 
-  mutate(seaStr_var = pmax(0, 1 - var_R/var_SR))
-  
+  mutate(seaStr_var  = pmax(0, 1 - var_R/var_SR),
+         seaStr_var2 = pmax(0, 1 - var_LBR/var_y),
+         
+         seaStr_var.ln  = pmax(0, 1 - var_lnR/var_lnSR),
+         seaStr_var2.ln = pmax(0, 1 - var_lnLBR/var_lny)
+         
+         
+         )
+
+
+
+
+
 
 
 # 2. SD of average seasonal factor
@@ -239,6 +266,90 @@ df_seaStr <-
 #   filter(.model == "dlemplyMon_construction")
 # 
 # df_seaStr %>% filter(.model == "dlemplyMon_construction")
+```
+
+
+## - Tables for seasonal strength, for paper
+
+```{r}
+
+df_seaStr_var_tbl <- 
+  df_seaStr_var %>% 
+  select(State, .model, starts_with("seaStr")) %>% 
+  filter(.model %in% c("SSDI", "SSI", "conc", "UIIC",  "unemply")) %>% 
+  mutate(.model = factor(.model, c("SSDI", "SSI", "conc", "UIIC", "unemply"))) %>% 
+  arrange(State, .model)
+
+df_seaStr_gg_tbl <- 
+  df_seaStr_gg %>% 
+  select(State, .model, starts_with("seaStr")) %>% 
+  filter(.model %in% c("SSDI", "SSI", "conc", "UIIC",  "unemply")) %>% 
+  mutate(.model = factor(.model, c("SSDI", "SSI", "conc", "UIIC", "unemply"))) %>% 
+  arrange(State, .model)
+  
+
+
+
+
+## Table showing var-based seasonal strength for US total
+
+df_seaStr_var_tbl %>% 
+  filter(State == "US+")
+
+df_seaStr_var_tbl %>% 
+  filter(State == "US")
+
+tbl_seaStr_var_US <- 
+  df_seaStr_var_tbl %>% 
+  filter(State == "US+") %>% 
+  select(.model, seaStr_var, seaStr_var2) %>% 
+  mutate(.model = factor(.model, levels = c("SSDI", "SSI", "conc", "UIIC", "unemply"),
+                                 labels = c("SSDI", "SSI", "Concurrent", "UI Initial", "Unemployment"))) %>% 
+  gt %>% 
+  cols_label(
+    .model = "",
+    seaStr_var  = "without trend",
+    seaStr_var2 = "with trend"
+  ) %>% 
+  tab_spanner(
+    label = "Seasonal strength with respect to sereis",
+    columns = c(
+      seaStr_var,  
+ seaStr_var2 )
+  ) %>% 
+  fmt_number(columns = 2:3,
+             decimals = 2)
+tbl_seaStr_var_US
+  
+
+
+## Variation of var-based measure across states: bar plot
+
+library(forcats)
+
+# Plot for SSDI
+df_seaStr_var_tbl %>% 
+  filter(.model == "SSDI",
+         State %in% state.abb) %>% 
+  arrange(desc(seaStr_var)) %>% 
+  mutate(State = factor(State) %>% fct_inorder) %>% 
+  ggplot(aes(x = State, y = seaStr_var)) + theme_bw() + 
+  geom_bar(stat = "identity", fill = "dodgerblue4", width = 0.8) +
+  coord_cartesian(ylim = c(0,1)) + 
+  scale_y_continuous(breaks = seq(0,1, 0.1)) + 
+  labs(
+       title = "Seasonal strength with respect to detrended series, by state, 2000:10-2020:2",
+       y = "Seasonal strength with respect to detrended series")
+  
+
+
+
+
+
+
+
+
+
 ```
 
 

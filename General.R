@@ -51,6 +51,7 @@ library(lattice)
 #library(knitr)
 #library(texreg)
 library(xtable)
+library(gt)
 
 
 library(doParallel)

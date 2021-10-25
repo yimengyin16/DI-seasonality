@@ -132,7 +132,7 @@ Panel <-
   
 ## Adding index
 df_idx <- 
-  Panel_all %>% filter(State == "NW") %>% 
+  Panel %>% filter(State == "NW") %>% 
   dplyr::select(date_yearmon) %>% 
   mutate(index = 1:n())
        
@@ -209,9 +209,9 @@ Panel_unadj     <- filter(Panel_unadj,date_yearmon <= "2020-2")
 # Figure 2
 # NW (including agencies)
 AppSeries = subset(Panel_all, State == "NW", c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
-
 AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
 AppSeries = melt(AppSeries, id = "Formatted.Date")
+
 
 
 ThreeSeries.NW = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = variable)) + theme_bw() + 
@@ -233,8 +233,10 @@ ggsave(ThreeSeries.NW, filename = "paper_plot/fig_newVer/ThreeSeries.NW.png",
 
 
 
-plot_3series <- function(State_slc){
-  AppSeries = subset(Panel_all, State == State_slc, c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
+plot_3series <- function(State_slc, df = Panel_all){
+  # State_slc = "NY"
+  # df = Panel_unadj_all
+  AppSeries = subset(df, State == State_slc, c("Formatted.Date", "Title.2", "Title.16", "Concurrent"))
   
   AppSeries$Formatted.Date = as.Date(as.yearmon(AppSeries$Formatted.Date))
   AppSeries = melt(AppSeries, id = "Formatted.Date")
@@ -247,7 +249,7 @@ plot_3series <- function(State_slc){
                 geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
                 
                 scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
-                scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-5-1"))) + 
+                scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-8-1"))) + 
                 labs(title = State_slc,
                      x = NULL, y = "Number of Applications", colour = NULL) + 
                 theme(legend.position = "bottom")
@@ -268,7 +270,7 @@ states_order0 <-
   mutate(state = as.character(State)) %>% 
   pull(state)
 
-states_order0 <- c(setdiff(states_order0, c("A9", "A8")))
+states_order0 <- c(setdiff(states_order0, c("A9", "A8", "FED")))
 
 
 threeSeries_large <- 
@@ -280,8 +282,11 @@ threeSeries_ordered <-
 threeSeries_region <- 
   map(c(regionNames), plot_3series)
 
-# threeSeries_ordered[[1]]
-# threeSeries_large[[1]] 
+threeSeries_ordered[1]
+
+# Series with outliers
+threeSeries_unadj_ordered <- map(c(states_order0), plot_3series, df = Panel_unadj_all)
+
 
 
 cairo_pdf(paste0(plot.path, "fig_explore/3series_large.pdf"), width = 10, height = 4.8, onefile = T)
@@ -296,6 +301,24 @@ dev.off()
 cairo_pdf(paste0(plot.path, "fig_explore/3series_regions.pdf"), width = 10, height = 5.2, onefile = T)
 threeSeries_region
 dev.off()
+
+cairo_pdf(paste0(plot.path, "fig_explore_wOutliers/3series_ordered_wOutliers_202108.pdf"), width = 10, height = 5.2, onefile = T)
+threeSeries_unadj_ordered
+dev.off()
+
+
+# NJ:
+# 2000-11: all three types
+
+# MI:
+# 2004-5, 2004-6, SSI
+
+# NY:
+# 2001-11, all three types (SSI more prominent)
+
+# Adjusting data error in 2014:11: application, determiniation and allowance are the same for SSI and concurrent. 
+
+
 
 ```
 
@@ -408,8 +431,8 @@ mod_ets <- list(
   jobOpen     = df_model %>% rename(y = jobOpen_u)    %>% filter(date_yearmon >= yearmonth("2000-12")) %>% model(jobOpen = ETS(update(ets_fml_MM, y ~.))),
   jobOpenRate = df_model %>% rename(y = jobOpenRate_u)%>% filter(date_yearmon >= yearmonth("2000-12")) %>% model(jobOpenRate = ETS(update(ets_fml_MM, y ~.))),
 
-  UIIC = df_model %>% rename(y = UIIC) %>%  filter(!State %in% c("DC", "NW")) %>% filter(!is.na(y))  %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
-  UICC = df_model %>% rename(y = UICC) %>%  filter(!State %in% c("DC", "NW")) %>% filter(!is.na(y))  %>% model(UICC = ETS(update(ets_fml_MM, y ~.))),
+  UIIC = df_model %>% rename(y = UIIC) %>%  filter(!State %in% c("DC")) %>% filter(!is.na(y))  %>% model(UIIC = ETS(update(ets_fml_MM, y ~.))),
+  UICC = df_model %>% rename(y = UICC) %>%  filter(!State %in% c("DC")) %>% filter(!is.na(y))  %>% model(UICC = ETS(update(ets_fml_MM, y ~.))),
 
   # Constructing and mining data do not contain DE and HI
   # mining data for FL starts in 2002-1

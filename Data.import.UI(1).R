@@ -209,5 +209,3 @@ save(data_UI_SSA, file = "Data/data_UI_SSA.RData")
 
 
 
-
-
