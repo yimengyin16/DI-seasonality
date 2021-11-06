@@ -206,35 +206,27 @@ df_adj <-
 
 
 ## Check the number of outliers
-# df_outOnly  <-
-# 	df_adj %>%
-# 	filter(value != value_adjOut)
-# 
-# df_outOnly %>%
-# 	filter(Var == "Title.2",
-# 				 date_yearmon <= as.yearmon("2020-02") # zoo
-# 				 )
-# 
-# df_outOnly_N <-
-#   df_outOnly %>%
-# 	filter(date_yearmon <= as.yearmon("2020-02")) %>%  # zoo
-# 	summarize(N = n()) %>%
-# 	arrange(Var, State)
- 	
+df_outOnly  <-
+	df_adj %>%
+	filter(value != value_adjOut)
+
+df_outOnly_N <-
+	df_outOnly %>%
+	filter(date_yearmon <= as.yearmon("2020-02")) %>%  # zoo
+	summarize(N = n()) %>%
+	arrange(Var, State) %>% 
+	spread(Var, N) %>% 
+  relocate(State, Title.2, Title.16, Concurrent)
+
+
+
+
 
 
 ## Adjusting outliers
 df_adj <-
   df_adj %>%
-	mutate(value = ifelse(date_yearmon > as.yearmon("2020-02") | (State %in% agencyNames), value, value_adjOut),
-				 value_adjOut = NULL)
-
-
-# df_adj %>% 
-# 	filter(State == "MI", Var == "Title.16", date_yearmon >= "2004-01")
-# df_adj$State %>% unique 
-
-
+	mutate(value = ifelse(date_yearmon > as.yearmon("2020-02") | (State %in% agencyNames), value, value_adjOut))
 
 
 
@@ -274,6 +266,8 @@ df_adj <-
 
 
 ## National aggregate (AG: 50 states + DC, no PR)
+
+df_adj <- df_adj %>% mutate(value_adjOut = NULL)
 
 df_adj <- 
 bind_rows(

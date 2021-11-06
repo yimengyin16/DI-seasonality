@@ -204,7 +204,6 @@ Panel_unadj     <- filter(Panel_unadj,date_yearmon <= "2020-2")
 
 3 DI application series for aggregate and 10 states. 
 
-
 ```{r applicationSeries}
 # Figure 2
 # NW (including agencies)
@@ -1305,7 +1304,6 @@ fig_season_allow_US <- plot_season_avg_allow("US")
 ggsave(fig_season_allow_US, filename = paste0(dir.fig_newVer, "fig_season_avg_allow.png"), width = 7.1 , height = 8.4, dpi = 300)
 
 
-
 ```
 
 
@@ -1598,7 +1596,7 @@ df_covid2 <-
          DIType = str_extract(Var, "SSDI|SSI|Concurrent"),
          Month = month(date_yearmon)) %>% 
   ungroup() %>% 
-  select(DIType, Month,date_yearmon , season_actual)
+  dplyr::select(DIType, Month, date_yearmon , season_actual)
 
 
 df_season_mod <- 

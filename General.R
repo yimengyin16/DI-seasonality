@@ -66,7 +66,7 @@ library(foreach)
 # User defined functions-------------------------------------------------------
 
 
-select = function(category, region, data, start = c(2000, 10),end = c(2020,2), zoo = FALSE,
+select1 = function(category, region, data, start = c(2000, 10),end = c(2020,2), zoo = FALSE,
                   na.rm = FALSE, sea.rm = FALSE){
 # A function for selecting a particular seires.
 # "zoo" is required. 

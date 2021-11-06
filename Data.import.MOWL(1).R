@@ -35,10 +35,8 @@
 ## states.usaww
 
 
-#top5 = c("NW","CA","TX","FL","NY","PA")
-#top10 = c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
-
-
+# top5 = c("NW","CA","TX","FL","NY","PA")
+# top10 = c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
 
 
 source("General.R")
@@ -56,8 +54,6 @@ all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-08.csv", header = FALSE)
 NAME = names(read.csv("Data/MOWL/SSA-SA-MOWL-2014-07.csv"))
 names(all0) = NAME
 rm(NAME)
-
-
 
 
 # Date translation table
@@ -97,7 +93,7 @@ all0 = all0[ c(  "Region.Code",
                  varlist
                  )]
 
-# Create variables "DI" = SSDI only + Concurrent, and "SSI" = SSI only + concurrent
+# Create variables "DI" = SSDI only + Concurrent, and "SSI" = SSI only + concurrent (wont't be used now 11/6/2021)
 all0 <- all0 %>%  mutate(across(!c(Region.Code:Formatted.Date), ~ as.numeric(str_remove(.x, ","))))
 
 all0$DI  = with(all0, Receipts..Initial.SSDI.Only. + Receipts..Initial.Concurrent.Only.)
@@ -108,8 +104,7 @@ all0$SSI = with(all0, Receipts..Initial.SSI.Only.  + Receipts..Initial.Concurren
 # 	filter(State.Code == "FE")
 
 
-
-# Creating nationwide sum for each month in each year. GU and PR are excluded. 
+# Creating nationwide sum for each month in each year.
 nation = aggregate(all0[all0$State.Code %in% c(statesAll, agencyNames), c(varlist, "DI", "SSI")],
                    list(Formatted.Date = all0[all0$State.Code %in% c(statesAll, agencyNames),]$Formatted.Date),
                    sum)
@@ -177,8 +172,7 @@ for (i in 1:nrow(all0))
 # TODO: May not be necessary now. 
 
 
-# Also check 2005-9, and 2016-9 data
-
+# Also check 2005-9,
 all0[all0$Formatted.Date == "2011-09", "No.week"] = 5
 all0[all0$Formatted.Date == "2016-09", "No.week"] = 5
 

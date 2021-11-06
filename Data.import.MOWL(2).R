@@ -7,10 +7,11 @@
 
 # Notes on collection of states
 
-# NW: all states and regions
+# NW: all states and regions (including Federal agencies)
 # AG: 50 states + DC
-# A8: 48 continental states (DC excluded)
-# A9: 49 continental states (DC included)
+# A8: 48 continental states (DC excluded) # Not needed anymore
+# A9: 49 continental states (DC included) # Not needed anymore
+# AG2: Sum of all regions, including DC, PR, Fedral agencies
 
 
 ## including AG and DC
@@ -34,10 +35,8 @@
 ## states.usaww
 
 
-#top5 = c("NW","CA","TX","FL","NY","PA")
-#top10 = c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
-
-
+# top5 = c("NW","CA","TX","FL","NY","PA")
+# top10 = c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
 
 
 source("General.R")
@@ -47,16 +46,14 @@ source("General.R")
 
 # all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2014.8.csv"), header = FALSE)
 # all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2019.08.csv"), header = FALSE)
-all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-04.csv", header = FALSE)
+all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-08.csv", header = FALSE)
 
 
 
-# "SSA-SA-MOWL-2021.08.csv" contains no variable names, need to extract variable names from "SSA-SA-MOWL-2014.7.csv"
+# "SSA-SA-MOWL-2021-08.csv" contains no variable names, need to extract variable names from "SSA-SA-MOWL-2014.7.csv"
 NAME = names(read.csv("Data/MOWL/SSA-SA-MOWL-2014-07.csv"))
 names(all0) = NAME
 rm(NAME)
-
-
 
 
 # Date translation table
@@ -96,17 +93,20 @@ all0 = all0[ c(  "Region.Code",
                  varlist
                  )]
 
-# Create variables "DI" = SSDI only + Concurrent, and "SSI" = SSI only + concurrent
+# Create variables "DI" = SSDI only + Concurrent, and "SSI" = SSI only + concurrent (wont't be used now 11/6/2021)
 all0 <- all0 %>%  mutate(across(!c(Region.Code:Formatted.Date), ~ as.numeric(str_remove(.x, ","))))
 
 all0$DI  = with(all0, Receipts..Initial.SSDI.Only. + Receipts..Initial.Concurrent.Only.)
 all0$SSI = with(all0, Receipts..Initial.SSI.Only.  + Receipts..Initial.Concurrent.Only.)
 
-all0
+# x <- 
+# all0 %>% 
+# 	filter(State.Code == "FE")
+
 
 # Creating nationwide sum for each month in each year.
-nation = aggregate(all0[c(varlist, "DI", "SSI")],
-                   list(Formatted.Date = all0$Formatted.Date),
+nation = aggregate(all0[all0$State.Code %in% c(statesAll, agencyNames), c(varlist, "DI", "SSI")],
+                   list(Formatted.Date = all0[all0$State.Code %in% c(statesAll, agencyNames),]$Formatted.Date),
                    sum)
 
 nation$State.Code = "NW"
@@ -122,6 +122,7 @@ aggregated = aggregate(all0[all0$State.Code %in% statesAll, c(varlist, "DI", "SS
 
 aggregated$State.Code = "AG"
 aggregated$Region.Code = "AG"
+
 aggregated$Date = all0$Date[all0$State.Code == "DC"]
 
 
@@ -149,6 +150,7 @@ aggregated49$Date = all0$Date[all0$State.Code == "DC"]
 all0 = rbind(all0,nation, aggregated, aggregated49, aggregated48)
 
 
+
 # Create varialbe "Cal.Year" and "Month" in "all0"
 all0$Cal.Year = as.integer(substring(all0$Formatted.Date,1,4))
 all0$Month    = as.integer(substring(all0$Formatted.Date,6,7))
@@ -166,14 +168,16 @@ for (i in 1:nrow(all0))
 
 
 
-# correcting the number of weeks in 2011-9 from 4 to 5.
-# TODO: May not be necessary now. 
+# TODO: check 2005-9, 2011-9 and 2016-09. 
+# SSA: document says they contain 4 ssa weeks. 
+#      But for 2011-9 and and 2016-09, they look more like 5 weeks' data
+#      For now, adjust 2011-0 and 2016-9 to 5 weeks.
 
 
-# Also check 2005-9, and 2016-9 data
-
-all0[all0$Formatted.Date == "2011-09", "No.week"] = 5
-all0[all0$Formatted.Date == "2016-09", "No.week"] = 5
+##  If corrections are needed.
+#  all0[all0$Formatted.Date == "2005-09", "No.week"] = 5
+ all0[all0$Formatted.Date == "2011-09", "No.week"] = 5
+ all0[all0$Formatted.Date == "2016-09", "No.week"] = 5
 
 
 
@@ -253,91 +257,93 @@ all = transform(all, Total      = Total.o*adj.factor,
 
 ## Adjusting outlier in 2004:6
 # TODO: see if the issue still exist in the lastest data
-
-New_Jun = function(category, region, Data){
-#                 category = "Title.2"
-#                 region = "NW"
-#                 Data = all 
-              value.May <- Data[Data$State == region & Data$Formatted.Date == "2004-05", category]
-              x <- window(select(category, region, Data), end = c(2007,12))
-              x <- diff(log(x))
-              
-              #x = window(select("dlTotal", "NW", Panel), end = c(2007,12))
-              
-              odummy1 <- numeric(length(x))
-              odummy2 <- numeric(length(x))
-              odummy1[44] <- 1
-              odummy2[45] <- 1
-              
-              fit <- lm(x ~ factor(cycle(x))+ odummy1 + odummy2)
-              #summary(fit)
-              ol.adj <- summary(fit)$coef["odummy1","Estimate"]
-              ol.adj
-              
-              dlvalue.Jun = x[44] - ol.adj 
-              new.value.Jun = exp(log(value.May) + dlvalue.Jun)
-            }
- 
-
-for (i in statesAll){
-  for (j in c("Title.2", "Title.16", "Concurrent",
-              "Det.Total",   
-              "Allow.Total", 
-              "Det.Title.2",   
-              "Allow.Title.2", 
-              "Det.Title.16",   
-              "Allow.Title.16", 
-              "Det.Concurrent",
-              "Allow.Concurrent")){
-    all[all$State == i & all$Formatted.Date == "2004-06", j] = 
-      New_Jun(category = j, region = i, all)  
-  }
-  
-  all[all$State == i & all$Formatted.Date == "2004-06", "Total"] = 
-    all[all$State == i & all$Formatted.Date == "2004-06", "Title.2"] + 
-    all[all$State == i & all$Formatted.Date == "2004-06", "Title.16"] +
-    all[all$State == i & all$Formatted.Date == "2004-06", "Concurrent"]
-  
-  all[all$State == i & all$Formatted.Date == "2004-06", "DI"] = 
-    all[all$State == i & all$Formatted.Date == "2004-06", "Title.2"] + 
-    all[all$State == i & all$Formatted.Date == "2004-06", "Concurrent"]
-  
-  all[all$State == i & all$Formatted.Date == "2004-06", "SSI"] = 
-    all[all$State == i & all$Formatted.Date == "2004-06", "Title.16"] + 
-    all[all$State == i & all$Formatted.Date == "2004-06", "Concurrent"]
-  
-  print(i)
-}
+# update 2021/11/6: as we have a new outlier-correction procedure, do not do this anymore
 
 
-for (j in c("Total", "Title.2", "Title.16", "Concurrent", "DI", "SSI",
-            "Det.Total",   
-            "Allow.Total", 
-            "Det.Title.2",   
-            "Allow.Title.2", 
-            "Det.Title.16",   
-            "Allow.Title.16", 
-            "Det.Concurrent",
-            "Allow.Concurrent")){
-  all[all$State == "NW" & all$Formatted.Date == "2004-06", j] <- 
-    sum(subset(all, (!State %in% c("NW", "AG", "A8", "A9")) & Formatted.Date == "2004-06", j))
-  
-  all[all$State == "AG" & all$Formatted.Date == "2004-06", j] <- 
-    sum(subset(all, (State %in% statesAll) & Formatted.Date == "2004-06", j))
-  
-  all[all$State == "A8" & all$Formatted.Date == "2004-06", j] <- 
-    sum(subset(all, (State %in% states48) & Formatted.Date == "2004-06", j))
-  
-  all[all$State == "A9" & all$Formatted.Date == "2004-06", j] <- 
-    sum(subset(all, (State %in% states49) & Formatted.Date == "2004-06", j))
-}
+# New_Jun = function(category, region, Data){
+# #                 category = "Title.2"
+# #                 region = "NW"
+# #                 Data = all 
+#               value.May <- Data[Data$State == region & Data$Formatted.Date == "2004-05", category]
+#               x <- window(select(category, region, Data), end = c(2007,12))
+#               x <- diff(log(x))
+#               
+#               #x = window(select("dlTotal", "NW", Panel), end = c(2007,12))
+#               
+#               odummy1 <- numeric(length(x))
+#               odummy2 <- numeric(length(x))
+#               odummy1[44] <- 1
+#               odummy2[45] <- 1
+#               
+#               fit <- lm(x ~ factor(cycle(x))+ odummy1 + odummy2)
+#               #summary(fit)
+#               ol.adj <- summary(fit)$coef["odummy1","Estimate"]
+#               ol.adj
+#               
+#               dlvalue.Jun = x[44] - ol.adj 
+#               new.value.Jun = exp(log(value.May) + dlvalue.Jun)
+#             }
+#  
+# 
+# for (i in statesAll){
+#   for (j in c("Title.2", "Title.16", "Concurrent",
+#               "Det.Total",   
+#               "Allow.Total", 
+#               "Det.Title.2",   
+#               "Allow.Title.2", 
+#               "Det.Title.16",   
+#               "Allow.Title.16", 
+#               "Det.Concurrent",
+#               "Allow.Concurrent")){
+#     all[all$State == i & all$Formatted.Date == "2004-06", j] = 
+#       New_Jun(category = j, region = i, all)  
+#   }
+#   
+#   all[all$State == i & all$Formatted.Date == "2004-06", "Total"] = 
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Title.2"] + 
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Title.16"] +
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Concurrent"]
+#   
+#   all[all$State == i & all$Formatted.Date == "2004-06", "DI"] = 
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Title.2"] + 
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Concurrent"]
+#   
+#   all[all$State == i & all$Formatted.Date == "2004-06", "SSI"] = 
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Title.16"] + 
+#     all[all$State == i & all$Formatted.Date == "2004-06", "Concurrent"]
+#   
+#   print(i)
+# }
+# 
+# 
+# for (j in c("Total", "Title.2", "Title.16", "Concurrent", "DI", "SSI",
+#             "Det.Total",   
+#             "Allow.Total", 
+#             "Det.Title.2",   
+#             "Allow.Title.2", 
+#             "Det.Title.16",   
+#             "Allow.Title.16", 
+#             "Det.Concurrent",
+#             "Allow.Concurrent")){
+#   all[all$State == "NW" & all$Formatted.Date == "2004-06", j] <- 
+#     sum(subset(all, (!State %in% c("NW", "AG", "A8", "A9")) & Formatted.Date == "2004-06", j))
+#   
+#   all[all$State == "AG" & all$Formatted.Date == "2004-06", j] <- 
+#     sum(subset(all, (State %in% statesAll) & Formatted.Date == "2004-06", j))
+#   
+#   all[all$State == "A8" & all$Formatted.Date == "2004-06", j] <- 
+#     sum(subset(all, (State %in% states48) & Formatted.Date == "2004-06", j))
+#   
+#   all[all$State == "A9" & all$Formatted.Date == "2004-06", j] <- 
+#     sum(subset(all, (State %in% states49) & Formatted.Date == "2004-06", j))
+# }
 
 
 
 
 ## Adjusting data error in 2014:11: application, determiniation and allowance are the same for SSI and concurrent. 
-# TODO check if the error still exist in the latest data
-
+# TODO check if the error still exist in the latest data:last checked with MOWL-2021-08, issue still exists
+# Note tha only all is adjusted. 
 
 all <- 
 	all %>% 
@@ -356,7 +362,6 @@ all <-
 								Allow.Title.2    = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Title.2, 12) + dplyr::lead(Allow.Title.2, 12)), Allow.Title.2),
 								Allow.Title.16   = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Title.16, 12) + dplyr::lead(Allow.Title.16, 12)), Allow.Title.16),
 								Allow.Concurrent = ifelse(Cal.Year == 2014 & Month == 11, 0.5 * (dplyr::lag(Allow.Concurrent, 12) + dplyr::lead(Allow.Concurrent, 12)), Allow.Concurrent)
-								
 								)
 	
 
@@ -380,6 +385,7 @@ all = transform(all, AllowRate.Total      = Allow.Total / Det.Total,
 
 save(all0, all, file = "Data/all.RData")
 
+# all$Formatted.Date %>% unique
 
 rm(i,
    nation,
