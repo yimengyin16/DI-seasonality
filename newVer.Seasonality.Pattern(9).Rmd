@@ -1069,7 +1069,7 @@ df_season_avg <-
 
 
 ## Plotting seasonal factors of disability applications ----
-state_slc <- "US"
+state_slc <- "US+"
 var_slc <- c("SSDI", "SSI", "conc")
 var_slc_lab <- c("SSDI only", "SSI only", "Concurrent")
 month_lab <- c("Jan", "Feb", "Mar", "Apr",
@@ -1104,6 +1104,7 @@ plot_season_avg <- function(slc){
 fig_season_avg_US <- plot_season_avg("US") + labs(title = NULL)
 fig_season_avg_NW <- plot_season_avg("US+") + labs(title = NULL)
 
+
 # 5 big states
 fig_season_avg_big6 <- 
   map(c("CA", "TX", "FL", "NY", "PA", "OH"), plot_season_avg)
@@ -1116,6 +1117,10 @@ marrangeGrob(fig_season_avg_big6, ncol = 2, nrow = length(fig_season_avg_big6)/2
 
 ggsave(fig_season_avg_US, filename = paste0(dir.fig_newVer, "fig_season_avg_US.png"),
        width = 8, height = 4.5)
+
+ggsave(fig_season_avg_US, filename = paste0(dir.fig_newVer, "fig_season_avg_US+.png"),
+       width = 8, height = 4.5)
+
 
 ggsave(fig_season_avg_big6, filename = paste0(dir.fig_newVer, "fig_season_avg_big6.png"),
        width = 18*0.95, height = 13*0.95)
@@ -1195,9 +1200,21 @@ fig_UIDI_US <-
      top = textGrob(NULL)
      )
 
+fig_UIDI_NW <- 
+   marrangeGrob(
+     grobs = plot_season_avg_UIDI("US+"),
+     nrow = 2,
+     ncol = 1,
+     top = textGrob(NULL)
+     )
+
+
 fig_UIDI_US
+fig_UIDI_NW
 
 ggsave(fig_UIDI_US, filename = paste0(dir.fig_newVer, "fig_season_UIDI_US.png"), width = 7 , height = 7)
+ggsave(fig_UIDI_NW, filename = paste0(dir.fig_newVer, "fig_season_UIDI_US+.png"), width = 7 , height = 7)
+
 
 
 
@@ -1634,7 +1651,7 @@ ggsave(fig_counterFct_season2, filename = paste0(dir.fig_newVer, "fig_counterFct
 
 
 # Variation across states
-
+## boxplot
 ```{r}
 ## Boxplots for all three types of DI applications
 
@@ -1643,7 +1660,7 @@ ggsave(fig_counterFct_season2, filename = paste0(dir.fig_newVer, "fig_counterFct
 df_season_avg$.model %>% unique 
 
 
-fig_season_boxplot <- 
+fig_season_boxplot_v <- 
 df_season_avg %>% 
   filter(.model %in% c("SSDI", "SSI", "conc"),
          State %in% c(state.abb, "DC")) %>% 
@@ -1660,9 +1677,186 @@ df_season_avg %>%
   labs(x = NULL,
        y = "Seasonal factor (multiplicative)")
 
+
+fig_season_boxplot_h <- 
+df_season_avg %>% 
+  filter(.model %in% c("SSDI", "SSI", "conc"),
+         State %in% c(state.abb, "DC")) %>% 
+  mutate(.model = factor(.model, c("SSDI", "SSI", "conc"),
+                                 c("SSDI only", "SSI only", "Concurrent")),
+         Month = factor(Month, 1:12, 
+                               month.abb)
+         ) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = (Month), y = season_avg)) + theme_bw() + facet_wrap(.~ .model, ncol = 3) + 
+  geom_boxplot(outlier.size = 1) + 
+  geom_hline(yintercept = 1, linetype = 2, color = "grey70") + 
+  coord_cartesian(ylim = c(0.75, 1.25)) + 
+  labs(x = NULL,
+       y = "Seasonal factor (multiplicative)")
+
   
-ggsave(fig_season_boxplot, filename = paste0(dir.fig_newVer, "fig_season_boxplots.png"),
+ggsave(fig_season_boxplot_v, filename = paste0(dir.fig_newVer, "fig_season_boxplots.png"),
        width = 7.7, height = 9.9) 
+
+  
+ggsave(fig_season_boxplot_h, filename = paste0(dir.fig_newVer, "fig_season_boxplots_h.png"),
+       width = 14, height = 4.5, scale = 0.75) 
+
+
+```
+
+
+## variation in pattern
+```{r}
+
+states_north <- c("AK", "MN", "NY", "ME")
+states_south <- c("AZ", "TX", "LA", "FL")
+
+
+## SSDI and unemployment 
+
+fig_unempSSDI_northSouth <- 
+  df_season_avg %>% 
+  filter(State  %in% c(states_north, states_south),
+        .model %in% c("unemply", "SSDI")
+        ) %>% 
+  # lag unemployment by 2 months
+  mutate(Month_lag = ifelse(.model == "unemply", 
+                        ifelse(Month > 10, Month - 12 + 2,
+                               Month + 2),
+                        Month
+                        ),
+         # Month_lag = str_sub(Month_lag, 1),
+         State = factor(State, c(states_north, states_south)),
+         NorthSouth = ifelse(State %in% states_north, "Northern states", "Southern states")
+         ) %>% 
+  mutate(.model = factor(.model, 
+                         c("unemply", "SSDI"), 
+                         c("Unemployment (2-month lag)", "SSDI only application"))) %>% 
+  arrange(.model) %>% 
+  ggplot(aes(x = Month_lag, y = season_avg, color = .model)) + theme_bw() + 
+  facet_wrap(. ~ State, nrow = 2) + 
+  geom_line(linetype =2) + 
+  geom_point(size = 1.5) + 
+  geom_hline(yintercept = 1, color = "grey70") + 
+  geom_hline(yintercept = c(1.1, 0.9), color = "grey70", linetype = 2) + 
+  #coord_cartesian(ylim = c(0.75, 1.25)) + 
+   coord_cartesian(ylim = c(0.7, 1.35)) + 
+  scale_x_continuous(breaks = 1:12, labels = str_sub(month_lab, 1, 1)) + 
+  scale_y_continuous(breaks = seq(0, 2, 0.1)) + 
+  scale_color_manual(values = c("black", "blue")) + 
+  labs(# title = slc,
+       x = NULL,
+       y = "Average seasonal factor (multiplicative)",
+       color = NULL) + 
+  theme(legend.position = "bottom"
+        #legend.position = c(0.72, 0.83)
+        )
+fig_unempSSDI_northSouth
+
+
+
+## UI and unemployment 
+fig_unempUI_northSouth <- 
+  df_season_avg %>% 
+  filter(
+         State  %in% c(states_north, states_south),
+        .model %in% c("unemply", "UIIC")
+        ) %>% 
+  mutate(.model = factor(.model, 
+                         c("unemply", "UIIC"), 
+                         c("Unemployment", "UI initial claim")),
+         State = factor(State, c(states_north, states_south))) %>% 
+  arrange(.model) %>% 
+  ggplot(aes(x = Month, y = season_avg, color = .model)) + theme_bw() + 
+  facet_wrap(. ~ State, nrow = 2) + 
+  geom_line(linetype =2) + 
+  geom_point(size = 1.5) + 
+  geom_hline(yintercept = 1, color = "grey70") + 
+  geom_hline(yintercept = c(1.1, 0.9), color = "grey70", linetype = 2) +
+  coord_cartesian(ylim = c(0.7, 1.35)) + 
+  scale_x_continuous(breaks = 1:12, labels = str_sub(month_lab, 1, 1)) + 
+  scale_y_continuous(breaks = seq(0, 2, 0.1)) + 
+  scale_color_manual(values = c("black", "red")) + 
+  labs(# title = slc,
+       x = NULL,
+       y = "Average seasonal factor (multiplicative)",
+       color = NULL) + 
+  theme(# legend.position = "bottom",
+        legend.position = c(0.72, 0.87) ) + 
+  theme(legend.position = "bottom"
+        #legend.position = c(0.72, 0.83)
+        )
+
+fig_unempUI_northSouth
+
+
+
+fig_unempSSDI.UI_northSouth <- 
+  df_season_avg %>% 
+  filter(State  %in% c(states_north, states_south),
+        .model %in% c("unemply", "SSDI", "UIIC")
+        ) %>% 
+  # lag unemployment by 2 months
+  mutate(Month_lag = ifelse(.model == "unemply", 
+                        ifelse(Month > 10, Month - 12 + 2,
+                               Month + 2),
+                        Month
+                        ),
+         # Month_lag = str_sub(Month_lag, 1),
+         State = factor(State, c(states_north, states_south)),
+         NorthSouth = ifelse(State %in% states_north, "Northern states", "Southern states")
+         ) %>% 
+  mutate(.model = factor(.model, 
+                         c("unemply", "SSDI", "UIIC"), 
+                         c("Unemployment (2-month lag)", "SSDI only application", "UI initial claim"))) %>% 
+  arrange(.model) %>% 
+  ggplot(aes(x = Month_lag, y = season_avg, color = .model)) + theme_bw() + 
+  facet_wrap(. ~ State, nrow = 2) + 
+  geom_line(linetype =2, size = 0.3) + 
+  geom_point(size = 1.2) + 
+  geom_hline(yintercept = 1, color = "grey70") + 
+  geom_hline(yintercept = c(1.1, 0.9), color = "grey70", linetype = 2) + 
+  #coord_cartesian(ylim = c(0.75, 1.25)) + 
+   coord_cartesian(ylim = c(0.7, 1.35)) + 
+  scale_x_continuous(breaks = 1:12, labels = str_sub(month_lab, 1, 1)) + 
+  scale_y_continuous(breaks = seq(0, 2, 0.1)) + 
+  scale_color_manual(values = c("black", "blue", "red")) + 
+  labs(# title = slc,
+       x = NULL,
+       y = "Average seasonal factor (multiplicative)",
+       color = NULL) + 
+  theme(legend.position = "bottom"
+        #legend.position = c(0.72, 0.83)
+        )
+fig_unempSSDI.UI_northSouth
+
+
+
+
+ggsave(fig_unempSSDI_northSouth, filename = paste0(dir.fig_newVer, "fig_northSouth_SSDI.png"),
+       width = 12, height = 7, scale = 0.9) 
+
+  
+ggsave(fig_unempUI_northSouth, filename = paste0(dir.fig_newVer, "fig_northSouth_UI.png"),
+       width = 12, height = 7, scale = 0.9) 
+
+
+
+  
+ggsave(fig_unempSSDI.UI_northSouth, filename = paste0(dir.fig_newVer, "fig_northSouth_SSDI.UI.png"),
+       width = 12, height = 7, scale = 0.85) 
+
+
+
+
+
+
+
+
+
+
 
 
 ```

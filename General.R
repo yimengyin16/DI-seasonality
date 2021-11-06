@@ -52,6 +52,7 @@ library(lattice)
 #library(texreg)
 library(xtable)
 library(gt)
+library(broom)
 
 
 library(doParallel)
