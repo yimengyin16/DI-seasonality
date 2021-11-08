@@ -28,6 +28,8 @@ library(purrr)
 library(grid)
 library(gridExtra)
 library(magrittr)
+library(stargazer)
+library(plm)
 
 options(xtable.include.rownames = F,
         xtable.booktabs = T,
@@ -744,23 +746,7 @@ stargazer(reg_gg.UIIC, reg_gg.SSDI, reg_gg.SSI, reg_gg.conc,  align = TRUE, type
 
 ```
 
-# Regression: seasonal pettern with all months
-
-LHS vars: for SSDI, SDI, and conc, and UIIC
- - seasonal factors for all months and states as a single variable 
-
-RHS var
-- unemployment and employment, level and % change
-   - seasonal factors for all months and states, with lags
-- Temperature:
-   - avg temp in all months and all states
-- Industrial structure by state (same for all month)
-    - share of construction
-    - share of highest 5
-    - share of modest 4
-    - share of farm
-- Interaction with each month
-
+# Regression with all months, data
 
 ## - Constructing variables
 ```{r}
@@ -856,7 +842,51 @@ df_reg_allmon_states <-
 # df_reg_allmon %>% names
 
 
+# create within-month variables 
+
+df_reg_allmon_within <- 
+  df_reg_allmon %>% 
+  group_by(month) %>% 
+  mutate(across(-c(State, seaQ_DIa, seaQ_DIb), ~ .x - mean(.x, na.rm =TRUE)))
+
+df_reg_allmon_within_states <-  
+  df_reg_allmon_within %>% 
+  filter(State %in% state.abb)
+
+
+
+
+df_reg_allmon_states %<>% 
+  relocate(month, State)
+
+df_reg_allmon_within_states %<>% 
+  relocate(month, State)
+
+
+
+
 ```
+
+
+
+# Regression: seasonal pettern with all months
+
+LHS vars: for SSDI, SDI, and conc, and UIIC
+ - seasonal factors for all months and states as a single variable 
+
+RHS var
+- unemployment and employment, level and % change
+   - seasonal factors for all months and states, with lags
+- Temperature:
+   - avg temp in all months and all states
+- Industrial structure by state (same for all month)
+    - share of construction
+    - share of highest 5
+    - share of modest 4
+    - share of farm
+- Interaction with each month
+
+
 
 
 
@@ -1131,19 +1161,6 @@ map_dfr(Ftest_conc, ~.x[2,])
 ```
 
 
-
-## - **paper**: Figures for temperature vs peaks 
-```{r}
-
-df_reg_allmon_states %>%
-  select(State, month, SSDI)
-
-
-
-
-``` 
-
-
 ## - **paper**: Regressions
 
 ```{r}
@@ -1407,6 +1424,1145 @@ map_dfr(Ftest_conc, ~.x[2,])
 
 
 ```
+
+
+
+# Regression: within-month variation, all months
+
+Use deviation 
+
+
+
+## - exploratory: lm
+
+```{r}
+
+
+# Variations in model specs
+#  - level unemployment (preferred), monthly change unemployment
+#  - Lags: (L1 + L2), L1, L2
+#  - Interaction:
+#     - months
+#     - Seasons
+#     - Seasons, separate dummy for Aug 
+#  - Temprature: L1, L2
+#     - consider 2/3-month moving average temperature
+
+
+
+
+### UI claims ------------------------------------------------------------------
+
+# No lag
+reg_allmon_UIIC.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ unemply - 1 , data = .)
+reg_allmon_UIIC.L0 %>% summary
+
+reg_allmon_UIIC.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ unemply + tempF:month - 1, data = .)
+reg_allmon_UIIC.L0 %>% summary
+
+reg_allmon_UIIC.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ unemply:month + tempF:month - 1, data = .)
+reg_allmon_UIIC.L0 %>% summary
+
+
+# 1mon lag
+reg_allmon_UIIC.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ L1.unemply - 1, data = .)
+reg_allmon_UIIC.L1 %>% summary
+
+reg_allmon_UIIC.L1<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ L1.unemply + tempF:month -1, data = .)
+reg_allmon_UIIC.L1 %>% summary
+
+reg_allmon_UIIC.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_UIIC.L1 %>% summary
+
+
+
+# no lag + 1mon lag
+reg_allmon_UIIC.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ unemply + L1.unemply - 1, data = .)
+reg_allmon_UIIC.L0L1 %>% summary
+
+reg_allmon_UIIC.L0L1<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ unemply + L1.unemply + tempF:month - 1, data = .)
+reg_allmon_UIIC.L0L1 %>% summary
+
+reg_allmon_UIIC.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(UIIC ~ unemply:month + L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_UIIC.L0L1 %>% summary
+
+
+# Take away:
+
+
+### SSDI claims ------------------------------------------------------------------
+
+# 0mon lag
+reg_allmon_SSDI.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ unemply - 1 , data = .)
+reg_allmon_SSDI.L0 %>% summary
+
+reg_allmon_SSDI.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ unemply + tempF:month - 1, data = .)
+reg_allmon_SSDI.L0 %>% summary
+
+reg_allmon_SSDI.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSDI.L0 %>% summary
+
+
+
+# 1mon lag
+reg_allmon_SSDI.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ L1.unemply - 1 , data = .)
+reg_allmon_SSDI.L1 %>% summary
+
+reg_allmon_SSDI.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ L1.unemply + tempF:month - 1, data = .)
+reg_allmon_SSDI.L1 %>% summary
+
+reg_allmon_SSDI.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSDI.L1 %>% summary
+
+
+# 2mon lag
+reg_allmon_SSDI.L2 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ L2.unemply - 1, data = .)
+reg_allmon_SSDI.L2 %>% summary
+
+reg_allmon_SSDI.L2<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ L2.unemply + tempF:month -1, data = .)
+reg_allmon_SSDI.L2 %>% summary
+
+reg_allmon_SSDI.L2 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ L2.unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSDI.L2 %>% summary
+
+
+
+# no lag + 1mon lag
+reg_allmon_SSDI.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ unemply + L1.unemply - 1, data = .)
+reg_allmon_SSDI.L0L1 %>% summary
+
+reg_allmon_SSDI.L0L1<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ unemply + L1.unemply + tempF:month - 1, data = .)
+reg_allmon_SSDI.L0L1 %>% summary
+
+reg_allmon_SSDI.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSDI ~ unemply:month + L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSDI.L0L1 %>% summary
+
+
+
+
+### SSI claims ------------------------------------------------------------------
+
+# 0mon lag
+reg_allmon_SSI.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ unemply - 1 , data = .)
+reg_allmon_SSI.L0 %>% summary
+
+reg_allmon_SSI.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ unemply + tempF:month - 1, data = .)
+reg_allmon_SSI.L0 %>% summary
+
+reg_allmon_SSI.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSI.L0 %>% summary
+
+
+
+# 1mon lag
+reg_allmon_SSI.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ L1.unemply - 1 , data = .)
+reg_allmon_SSI.L1 %>% summary
+
+reg_allmon_SSI.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ L1.unemply + tempF:month - 1, data = .)
+reg_allmon_SSI.L1 %>% summary
+
+reg_allmon_SSI.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSI.L1 %>% summary
+
+
+# 2mon lag
+reg_allmon_SSI.L2 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ L2.unemply - 1, data = .)
+reg_allmon_SSI.L2 %>% summary
+
+reg_allmon_SSI.L2<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ L2.unemply + tempF:month -1, data = .)
+reg_allmon_SSI.L2 %>% summary
+
+reg_allmon_SSI.L2 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ L2.unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSI.L2 %>% summary
+
+
+
+# no lag + 1mon lag
+reg_allmon_SSI.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ unemply + L1.unemply - 1, data = .)
+reg_allmon_SSI.L0L1 %>% summary
+
+reg_allmon_SSI.L0L1<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ unemply + L1.unemply + tempF:month - 1, data = .)
+reg_allmon_SSI.L0L1 %>% summary
+
+reg_allmon_SSI.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(SSI ~ unemply:month + L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_SSI.L0L1 %>% summary
+
+
+
+### Concurrent claims ------------------------------------------------------------------
+
+# 0mon lag
+reg_allmon_conc.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ unemply - 1 , data = .)
+reg_allmon_conc.L0 %>% summary
+
+reg_allmon_conc.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ unemply + tempF:month - 1, data = .)
+reg_allmon_conc.L0 %>% summary
+
+reg_allmon_conc.L0 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ unemply:month + tempF:month - 1, data = .)
+reg_allmon_conc.L0 %>% summary
+
+
+
+# 1mon lag
+reg_allmon_conc.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ L1.unemply - 1 , data = .)
+reg_allmon_conc.L1 %>% summary
+
+reg_allmon_conc.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ L1.unemply + tempF:month - 1, data = .)
+reg_allmon_conc.L1 %>% summary
+
+reg_allmon_conc.L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_conc.L1 %>% summary
+
+
+# 2mon lag
+reg_allmon_conc.L2 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ L2.unemply - 1, data = .)
+reg_allmon_conc.L2 %>% summary
+
+reg_allmon_conc.L2<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ L2.unemply + tempF:month -1, data = .)
+reg_allmon_conc.L2 %>% summary
+
+reg_allmon_conc.L2 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ L2.unemply:month + tempF:month - 1, data = .)
+reg_allmon_conc.L2 %>% summary
+
+
+
+# no lag + 1mon lag
+reg_allmon_conc.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ unemply + L1.unemply - 1, data = .)
+reg_allmon_conc.L0L1 %>% summary
+
+reg_allmon_conc.L0L1<- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ unemply + L1.unemply + tempF:month - 1, data = .)
+reg_allmon_conc.L0L1 %>% summary
+
+reg_allmon_conc.L0L1 <- 
+  df_reg_allmon_within_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  lm(conc ~ unemply:month + L1.unemply:month + tempF:month - 1, data = .)
+reg_allmon_conc.L0L1 %>% summary
+
+
+
+
+
+
+
+
+
+
+
+
+
+## F-test-----------------------------------------------------------------------
+# mod.UIIC <- 
+#   df_reg_allmon_states %>% 
+#   filter(!State %in% c("AK")) %>% 
+#   lm(I(UIIC - 1) ~ I(unemply-1):month + I(L1.unemply-1):month + tempF:month, data = .)
+# mod.UIIC %>% summary
+# 
+# mod.SSDI <- 
+#   df_reg_allmon_states %>% 
+#   filter(!State %in% c("AK")) %>% 
+#   lm(I(SSDI - 1) ~ I(L1.unemply - 1):month + I(L2.unemply - 1):month + tempF:month, data = .)
+# 
+# mod.SSI <- 
+#   df_reg_allmon_states %>% 
+#   filter(!State %in% c("AK")) %>% 
+#   lm(I(SSI - 1) ~ I(L1.unemply - 1):month + I(L2.unemply - 1):month + tempF:month, data = .)
+# 
+# mod.conc <- 
+#   df_reg_allmon_states %>% 
+#   filter(!State %in% c("AK")) %>% 
+#   lm(I(conc - 1) ~ I(L1.unemply - 1):month + I(L2.unemply - 1):month + tempF:month, data = .)
+# 
+# 
+# summary(mod.UIIC)
+# summary(mod.SSDI)
+# summary(mod.SSI)
+# summary(mod.conc)
+# 
+# 
+# 
+# H0 <- function(mon){
+#   c1 <- paste0("I(L1.unemply - 1):month", mon, "=0")
+#   c2 <- paste0("month", mon, ":I(L2.unemply - 1)=0")
+#   c(c1, c2)
+# }
+# 
+# H0_UIIC <- function(mon){
+#   c1 <- paste0("I(unemply - 1):month", mon, "=0")
+#   c2 <- paste0("month", mon, ":I(L1.unemply - 1)=0")
+#   c(c1, c2)
+# }
+# 
+# Ftest_UIIC <- map(1:12, function(x) linearHypothesis(mod.UIIC, H0_UIIC(x)))
+# map_dfr(Ftest_UIIC, ~.x[2,])
+# # consistent with model with 0 and 1 lages
+# 
+# 
+# Ftest_SSDI <- map(1:12, function(x) linearHypothesis(mod.SSDI, H0(x)))
+# map_dfr(Ftest_SSDI, ~.x[2,])
+# 
+# 
+# Ftest_SSI <- map(1:12, function(x) linearHypothesis(mod.SSI, H0(x)))
+# map_dfr(Ftest_SSI, ~.x[2,])
+# 
+# 
+# Ftest_conc <- map(1:12, function(x) linearHypothesis(mod.conc, H0(x)))
+# map_dfr(Ftest_conc, ~.x[2,])
+
+
+
+
+```
+
+
+## - exploratory: plm
+
+```{r}
+
+df_reg_allmon_within_states %<>% 
+  relocate(month, State)
+
+df_reg_allmon_states %<>% 
+  relocate(month, State)
+
+
+# UIIC -------------------------------------------------------------------------
+
+# no lag
+plm_allmon_UIIC.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_UIIC.L0 %>% summary
+plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+# plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_UIIC.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_UIIC.L0 %>% summary
+plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_UIIC.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_UIIC.L0 %>% summary
+plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+# 1mon lag
+plm_allmon_UIIC.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_UIIC.L1 %>% summary
+plm_allmon_UIIC.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_UIIC.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_UIIC.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_UIIC.L1 %>% summary
+plm_allmon_UIIC.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_UIIC.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_UIIC.L1 %>% summary
+plm_allmon_UIIC.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_UIIC.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+
+
+
+# SSDI -------------------------------------------------------------------------
+
+# no lag
+plm_allmon_SSDI.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_SSDI.L0 %>% summary
+plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+# plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSDI.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSDI.L0 %>% summary
+plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSDI.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSDI.L0 %>% summary
+plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+# 1mon lag
+plm_allmon_SSDI.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_SSDI.L1 %>% summary
+plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSDI.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSDI.L1 %>% summary
+plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSDI.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSDI.L1 %>% summary
+plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+# 2mon lag
+plm_allmon_SSDI.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L2.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_SSDI.L2 %>% summary
+plm_allmon_SSDI.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSDI.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L2.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSDI.L2 %>% summary
+plm_allmon_SSDI.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSDI.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L2.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSDI.L2 %>% summary
+plm_allmon_SSDI.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSDI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+# SSI -------------------------------------------------------------------------
+# no lag
+plm_allmon_SSI.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_SSI.L0 %>% summary
+plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+# plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSI.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSI.L0 %>% summary
+plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSI.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSI.L0 %>% summary
+plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+# 1mon lag
+plm_allmon_SSI.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_SSI.L1 %>% summary
+plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSI.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSI.L1 %>% summary
+plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSI.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSI.L1 %>% summary
+plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+# 2mon lag
+plm_allmon_SSI.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L2.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_SSI.L2 %>% summary
+plm_allmon_SSI.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSI.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L2.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSI.L2 %>% summary
+plm_allmon_SSI.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_SSI.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L2.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_SSI.L2 %>% summary
+plm_allmon_SSI.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_SSI.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+# SSI -------------------------------------------------------------------------
+
+# no lag
+plm_allmon_conc.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_conc.L0 %>% summary
+plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+# plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_conc.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_conc.L0 %>% summary
+plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_conc.L0 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_conc.L0 %>% summary
+plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+
+# 1mon lag
+plm_allmon_conc.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_conc.L1 %>% summary
+plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_conc.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_conc.L1 %>% summary
+plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_conc.L1 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_conc.L1 %>% summary
+plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+# 2mon lag
+plm_allmon_conc.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L2.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+plm_allmon_conc.L2 %>% summary
+plm_allmon_conc.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_conc.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L2.unemply + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_conc.L2 %>% summary
+plm_allmon_conc.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_conc.L2 <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L2.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+plm_allmon_conc.L2 %>% summary
+plm_allmon_conc.L2 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+#plm_allmon_conc.L1 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+```
+
+
+
+
+
+## - **paper**: plm
+
+```{r}
+
+# UIIC -------------------------------------------------------------------------
+
+
+
+# no lag
+plm_allmon_UIIC.L0.u <-  
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+#plm_allmon_UIIC.L0 %>% summary
+#plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+# plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+
+plm_allmon_UIIC.L0.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_UIIC.L0.umtm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(UIIC ~ unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+
+
+# SSDI -------------------------------------------------------------------------
+
+# 1mon lag
+plm_allmon_SSDI.L1.u <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+
+
+plm_allmon_SSDI.L1.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_SSDI.L1.um.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+# 2mon lag
+plm_allmon_SSDI.L2.u <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L2.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+
+
+plm_allmon_SSDI.L2.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L2.unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_SSDI.L2.um.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSDI ~ L2.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+
+
+
+# SSI -------------------------------------------------------------------------
+
+# 1mon lag
+plm_allmon_SSI.L1.u <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+
+
+plm_allmon_SSI.L1.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_SSI.L1.um.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+# 2mon lag
+plm_allmon_SSI.L2.u <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L2.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+
+
+plm_allmon_SSI.L2.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L2.unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_SSI.L2.um.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(SSI ~ L2.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+# Concurrent -------------------------------------------------------------------
+
+# 1mon lag
+plm_allmon_conc.L1.u <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L1.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+
+
+plm_allmon_conc.L1.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L1.unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_conc.L1.um.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L1.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+# 2mon lag
+plm_allmon_conc.L2.u <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L2.unemply, model = "within", effect = "individual", index = c("month", "State"), data = .)
+
+
+plm_allmon_conc.L2.u.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L2.unemply + tempF:month, model = "within", effect = "individual", data = .)
+
+
+plm_allmon_conc.L2.um.tm <- 
+  df_reg_allmon_states %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>% 
+  plm(conc ~ L2.unemply:month + tempF:month, model = "within", effect = "individual", data = .)
+
+
+
+## Result tables ---------------------------------------------------------------
+
+
+#plm_allmon_UIIC.L0 %>% summary
+#plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "white1"))
+# plm_allmon_UIIC.L0 %>% summary(vcov = function(x) vcovHC(x, method = "arellano"))
+
+summary_white1 <- function(x) summary(x, vcov = function(y) vcovHC(y, method = "white1"))
+
+
+
+seaStr.gg_depvarNames <- c("UI initial", "SSID", "SSI", "Concurrent") 
+seaStr.gg_covarNames  <- c("Sea. Strength of unemployment", "Anuual average temp.")  
+seaStr.gg_title <- "Regression results: seasonal strength"  
+
+
+stargazer(reg_gg.UIIC, reg_gg.SSDI, reg_gg.SSI, reg_gg.conc,  align = TRUE, type = "text",
+          title = seaStr.gg_title,
+          dep.var.labels= seaStr.gg_depvarNames,
+          covariate.labels= seaStr.gg_covarNames
+          )
+
+
+
+## Lables 
+
+plm_covarNames.DI <- c("Unemployment: 1-month lag",
+                       "Unemployment: 2-month lag",
+                        paste0("Temperature(F): ", month.abb)
+                      )
+
+plm_covarNames.UI <- c("Unemployment",
+                       "Unemployment: 1-month lag",
+                        paste0("Temperature(F): ", month.abb)
+                      )
+
+## SSDI table
+
+plm_allmon_SSDI.L1.u %>% summary_white1()
+plm_allmon_SSDI.L2.u.tm %>% summary_white1()
+plm_allmon_SSDI.L2.um.tm %>% summary_white1()
+
+
+vcov.SSDI.L1.u     <- sqrt(diag(vcovHC(plm_allmon_SSDI.L1.u, method = "white1")))
+vcov.SSDI.L1.u.tm  <- sqrt(diag(vcovHC(plm_allmon_SSDI.L1.u.tm, method = "white1")))
+vcov.SSDI.L1.um.tm <- sqrt(diag(vcovHC(plm_allmon_SSDI.L1.um.tm, method = "white1")))
+
+vcov.SSDI.L2.u     <- sqrt(diag(vcovHC(plm_allmon_SSDI.L2.u, method = "white1")))
+vcov.SSDI.L2.u.tm  <- sqrt(diag(vcovHC(plm_allmon_SSDI.L2.u.tm, method = "white1")))
+vcov.SSDI.L2.um.tm <- sqrt(diag(vcovHC(plm_allmon_SSDI.L2.um.tm, method = "white1")))
+
+stargazer(plm_allmon_SSDI.L1.u,
+          plm_allmon_SSDI.L2.u,
+          plm_allmon_SSDI.L1.u.tm,
+          plm_allmon_SSDI.L2.u.tm,
+          #plm_allmon_SSDI.L1.um.tm,
+          #plm_allmon_SSDI.L2.um.tm,
+          
+          se = list(vcov.SSDI.L1.u,
+                    vcov.SSDI.L2.u,
+                    vcov.SSDI.L1.u.tm,
+                    vcov.SSDI.L2.u.tm
+                    #vcov.SSDI.L1.um.tm,
+                    #vcov.SSDI.L2.um.tm 
+          ),
+          
+          align = TRUE, type = "text",
+          #title = seaStr.gg_title,
+          dep.var.labels = "SSDI only applications",
+          covariate.labels= plm_covarNames.DI
+          )
+
+
+
+## SSI table
+
+plm_allmon_SSI.L1.u %>% summary_white1()
+plm_allmon_SSI.L2.u.tm %>% summary_white1()
+plm_allmon_SSI.L2.um.tm %>% summary_white1()
+
+
+vcov.SSI.L1.u     <- sqrt(diag(vcovHC(plm_allmon_SSI.L1.u, method = "white1")))
+vcov.SSI.L1.u.tm  <- sqrt(diag(vcovHC(plm_allmon_SSI.L1.u.tm, method = "white1")))
+vcov.SSI.L1.um.tm <- sqrt(diag(vcovHC(plm_allmon_SSI.L1.um.tm, method = "white1")))
+
+vcov.SSI.L2.u     <- sqrt(diag(vcovHC(plm_allmon_SSI.L2.u, method = "white1")))
+vcov.SSI.L2.u.tm  <- sqrt(diag(vcovHC(plm_allmon_SSI.L2.u.tm, method = "white1")))
+vcov.SSI.L2.um.tm <- sqrt(diag(vcovHC(plm_allmon_SSI.L2.um.tm, method = "white1")))
+
+stargazer(plm_allmon_SSI.L1.u,
+          plm_allmon_SSI.L2.u,
+          plm_allmon_SSI.L1.u.tm,
+          plm_allmon_SSI.L2.u.tm,
+          #plm_allmon_SSI.L1.um.tm,
+          #plm_allmon_SSI.L2.um.tm,
+          
+          se = list(vcov.SSI.L1.u,
+                    vcov.SSI.L2.u,
+                    vcov.SSI.L1.u.tm,
+                    vcov.SSI.L2.u.tm
+                    #vcov.SSI.L1.um.tm,
+                    #vcov.SSI.L2.um.tm 
+          ),
+          
+          align = TRUE, type = "text",
+          #title = seaStr.gg_title,
+          dep.var.labels = "SSI only applications",
+          covariate.labels= plm_covarNames.DI
+          )
+
+
+## Concurrent table
+
+plm_allmon_conc.L1.u %>% summary_white1()
+plm_allmon_conc.L2.u.tm %>% summary_white1()
+plm_allmon_conc.L2.um.tm %>% summary_white1()
+
+
+vcov.conc.L1.u     <- sqrt(diag(vcovHC(plm_allmon_conc.L1.u, method = "white1")))
+vcov.conc.L1.u.tm  <- sqrt(diag(vcovHC(plm_allmon_conc.L1.u.tm, method = "white1")))
+vcov.conc.L1.um.tm <- sqrt(diag(vcovHC(plm_allmon_conc.L1.um.tm, method = "white1")))
+
+vcov.conc.L2.u     <- sqrt(diag(vcovHC(plm_allmon_conc.L2.u, method = "white1")))
+vcov.conc.L2.u.tm  <- sqrt(diag(vcovHC(plm_allmon_conc.L2.u.tm, method = "white1")))
+vcov.conc.L2.um.tm <- sqrt(diag(vcovHC(plm_allmon_conc.L2.um.tm, method = "white1")))
+
+stargazer(plm_allmon_conc.L1.u,
+          plm_allmon_conc.L2.u,
+          plm_allmon_conc.L1.u.tm,
+          plm_allmon_conc.L2.u.tm,
+          #plm_allmon_conc.L1.um.tm,
+          #plm_allmon_conc.L2.um.tm,
+          
+          se = list(vcov.conc.L1.u,
+                    vcov.conc.L2.u,
+                    vcov.conc.L1.u.tm,
+                    vcov.conc.L2.u.tm
+                    #vcov.conc.L1.um.tm,
+                    #vcov.conc.L2.um.tm 
+          ),
+          
+          align = TRUE, type = "text",
+          #title = seaStr.gg_title,
+          dep.var.labels = "conc only applications",
+          covariate.labels= plm_covarNames.DI
+          )
+
+
+## UIIC table
+plm_allmon_UIIC.L0.u %>% summary_white1()
+
+vcov.UIIC.L0.u     <- sqrt(diag(vcovHC(plm_allmon_UIIC.L0.u, method = "white1")))
+vcov.UIIC.L0.u.tm  <- sqrt(diag(vcovHC(plm_allmon_UIIC.L0.u.tm, method = "white1")))
+vcov.UIIC.L0.um.tm <- sqrt(diag(vcovHC(plm_allmon_UIIC.L0.um.tm, method = "white1")))
+
+# vcov.UIIC.L1.u     <- sqrt(diag(vcovHC(plm_allmon_UIIC.L1.u, method = "white1")))
+# vcov.UIIC.L1.u.tm  <- sqrt(diag(vcovHC(plm_allmon_UIIC.L1.u.tm, method = "white1")))
+# vcov.UIIC.L1.um.tm <- sqrt(diag(vcovHC(plm_allmon_UIIC.L1.um.tm, method = "white1")))
+
+stargazer(plm_allmon_UIIC.L0.u,
+          #plm_allmon_UIIC.L1.u,
+          plm_allmon_UIIC.L0.u.tm,
+          #plm_allmon_UIIC.L1.u.tm,
+          #plm_allmon_UIIC.L1.um.tm,
+          
+          se = list(vcov.UIIC.L0.u,
+                    vcov.UIIC.L0.u.tm),
+          
+          align = TRUE, type = "text",
+          #title = seaStr.gg_title,
+          dep.var.labels = "UI initial claims",
+          covariate.labels= plm_covarNames.UI
+          )
+
+
+
+
+
+## UI and SSDI table
+
+plm_covarNames.UISSDI <- c("Unemployment",
+                          "Unemployment: 1-month lag",
+                          "Unemployment: 2-month lag",
+                           paste0("Temperature(F): ", month.abb)
+                      )
+
+stargazer(plm_allmon_UIIC.L0.u,
+          plm_allmon_UIIC.L0.u.tm,
+          plm_allmon_SSDI.L1.u,
+          plm_allmon_SSDI.L2.u,
+          plm_allmon_SSDI.L1.u.tm,
+          plm_allmon_SSDI.L2.u.tm,
+
+          se = list(vcov.UIIC.L0.u,
+                    vcov.UIIC.L0.u.tm,
+                    vcov.SSDI.L1.u,
+                    vcov.SSDI.L2.u,
+                    vcov.SSDI.L1.u.tm,
+                    vcov.SSDI.L2.u.tm),
+          
+          align = TRUE, type = "text",
+          #title = seaStr.gg_title,
+          dep.var.labels = "UI initial claims",
+          covariate.labels= plm_covarNames.UISSDI,
+          order = c(1, 14, 15, 2:13)
+          )
+
+
+
+
+
+
+```
+
+
+
+
+
+
 
 
 
