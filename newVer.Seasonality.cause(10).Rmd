@@ -14,7 +14,7 @@ editor_options:
 library(plyr)
 library(ggplot2)
 library(scales)
-library(xtable)
+#library(xtable)
 #library(DataCombine) # it loads dplyr!
 library(magrittr)
 library("tidyr")
@@ -30,6 +30,7 @@ library(gridExtra)
 library(magrittr)
 library(stargazer)
 library(plm)
+library(glue)
 
 options(xtable.include.rownames = F,
         xtable.booktabs = T,
@@ -312,7 +313,7 @@ tbl_seaStr_var_US <-
     seaStr_var2 = "with trend"
   ) %>% 
   tab_spanner(
-    label = "Seasonal strength with respect to sereis",
+    label = "Seasonal strength with respect to series",
     columns = c(
       seaStr_var,  
  seaStr_var2 )
@@ -353,12 +354,9 @@ df_seaStr_var_tbl %>%
 ```
 
 
-
-
-## - Exploratory regressions, all states
+## - Data for regression
 
 ```{r}
-
 ## combining data
 df_reg_seaStr <- 
 # left_join(
@@ -394,6 +392,16 @@ df_reg_seaStr1 <-
 
 names(df_reg_seaStr)
 df_reg_seaStr$State %>% unique
+
+```
+
+
+
+## - Exploratory regressions, all states
+
+```{r}
+
+
 
 
 ## Plotting the correlation
@@ -682,16 +690,23 @@ library(stargazer)
 
 ## Regressions unemployment and temperature (no ind structure)
 # gg strength
-x <- 
-df_reg_seaStr1 %>% 
-  select(State, seaStr_gg.UIIC,  seaStr_gg.unemply, tempF, seaStr_gg.SSDI)
+# x <- 
+# df_reg_seaStr1 %>% 
+#   select(State, seaStr_gg.UIIC,  seaStr_gg.unemply, tempF, seaStr_gg.SSDI)
 
 # UI initial claim as reference
-reg_gg.UIIC <- 
+reg_gg.UIIC1 <- 
+  df_reg_seaStr1 %>% #(preferred model)
+  filter(!State %in% c("AK", "HI", "DC")) %>% # "ND"
+  lm(seaStr_gg.UIIC ~ seaStr_gg.unemply, data = .) 
+reg_gg.UIIC1 %>% summary()
+
+reg_gg.UIIC2 <- 
   df_reg_seaStr1 %>% #(preferred model)
   filter(!State %in% c("AK", "HI", "DC")) %>% # "ND"
   lm(seaStr_gg.UIIC ~ seaStr_gg.unemply + tempF, data = .) 
-reg_gg.UIIC %>% summary()
+reg_gg.UIIC2 %>% summary()
+
 
 # UIIC
 #   - employment is significant and greater than 1
@@ -700,42 +715,119 @@ reg_gg.UIIC %>% summary()
 #   - robust to including AK, except for gg.emplyMon_tot
 
 
-# Three types of DI applications
-reg_gg.SSDI <-
+# Three types of DI applications, unemployment only
+reg_gg.SSDI1 <-
+  df_reg_seaStr1 %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>%  #"CA"
+  lm(seaStr_gg.SSDI ~ seaStr_gg.unemply , data = .) 
+
+reg_gg.SSI1 <- 
+  df_reg_seaStr1 %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>%  #"CA"
+  lm(seaStr_gg.SSI ~ seaStr_gg.unemply , data = .) 
+
+reg_gg.conc1 <- 
+  df_reg_seaStr1 %>% 
+  filter(!State %in% c("AK", "HI", "DC")) %>%  #"CA"
+  lm(seaStr_gg.conc ~ seaStr_gg.unemply, data = .) 
+
+reg_gg.SSDI1 %>% summary()
+reg_gg.SSI1 %>% summary()
+reg_gg.conc1 %>% summary()
+
+# Three types of DI applications, unemployment + temperature
+reg_gg.SSDI2 <-
   df_reg_seaStr1 %>% 
   filter(!State %in% c("AK", "HI", "DC")) %>%  #"CA"
   lm(seaStr_gg.SSDI ~ seaStr_gg.unemply + tempF, data = .) 
 
-reg_gg.SSI <- 
+reg_gg.SSI2 <- 
   df_reg_seaStr1 %>% 
   filter(!State %in% c("AK", "HI", "DC")) %>%  #"CA"
   lm(seaStr_gg.SSI ~ seaStr_gg.unemply + tempF, data = .) 
 
-reg_gg.conc <- 
+reg_gg.conc2 <- 
   df_reg_seaStr1 %>% 
   filter(!State %in% c("AK", "HI", "DC")) %>%  #"CA"
   lm(seaStr_gg.conc ~ seaStr_gg.unemply + tempF, data = .) 
 
-reg_gg.SSDI %>% summary()
-reg_gg.SSI %>% summary()
-reg_gg.conc %>% summary()
 
+reg_gg.SSDI2 %>% summary()
+reg_gg.SSI2  %>% summary()
+reg_gg.conc2 %>% summary()
 
 # DI:
 #   - unemployment is not significant, (level, difference, growth)
 #   - tempF is significant only for concurrent, the estimate is very low and positive
 
 
+# Robust se
+
+vcov.gg.UIIC1 <- sqrt(diag(vcovHC(reg_gg.UIIC1, method = "HC3")))
+vcov.gg.UIIC2 <- sqrt(diag(vcovHC(reg_gg.UIIC2, method = "HC3")))
+
+vcov.gg.SSDI1 <- sqrt(diag(vcovHC(reg_gg.SSDI1, method = "HC3")))
+vcov.gg.SSDI2 <- sqrt(diag(vcovHC(reg_gg.SSDI2, method = "HC3")))
+
+vcov.gg.SSI1 <- sqrt(diag(vcovHC(reg_gg.SSI1, method = "HC3")))
+vcov.gg.SSI2 <- sqrt(diag(vcovHC(reg_gg.SSI2, method = "HC3")))
+
+vcov.gg.conc1 <- sqrt(diag(vcovHC(reg_gg.conc1, method = "HC3")))
+vcov.gg.conc2 <- sqrt(diag(vcovHC(reg_gg.conc2, method = "HC3")))
+
+
+
+
 seaStr.gg_depvarNames <- c("UI initial", "SSID", "SSI", "Concurrent") 
 seaStr.gg_covarNames  <- c("Sea. Strength of unemployment", "Anuual average temp.")  
-seaStr.gg_title <- "Regression results: seasonal strength"  
+seaStr.gg_title <- "Regression results: seasonal amplitude"  
 
-
-stargazer(reg_gg.UIIC, reg_gg.SSDI, reg_gg.SSI, reg_gg.conc,  align = TRUE, type = "text",
+# unemployment only
+stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,  align = TRUE, type = "text",
           title = seaStr.gg_title,
           dep.var.labels= seaStr.gg_depvarNames,
-          covariate.labels= seaStr.gg_covarNames
+          covariate.labels= seaStr.gg_covarNames[1],
+          
+          se = list(vcov.gg.UIIC1,
+                    vcov.gg.SSDI1,
+                    vcov.gg.SSI1,
+                    vcov.gg.conc1)
           )
+
+# unemployment and annual avg temperature
+stargazer(reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  align = TRUE, type = "text",
+          title = seaStr.gg_title,
+          dep.var.labels= seaStr.gg_depvarNames,
+          covariate.labels= seaStr.gg_covarNames,
+          
+          se = list(vcov.gg.UIIC2,
+                    vcov.gg.SSDI2,
+                    vcov.gg.SSI2,
+                    vcov.gg.conc2)
+          
+          )
+
+
+stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,
+          reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  
+          align = TRUE, type = "text",
+          title = seaStr.gg_title,
+          dep.var.labels= c(seaStr.gg_depvarNames, seaStr.gg_depvarNames),
+          covariate.labels= seaStr.gg_covarNames,
+          #column.labels = c("a", "b"),
+          #column.separate = c(4, 4),
+          
+           se = list(vcov.gg.UIIC1,
+                    vcov.gg.SSDI1,
+                    vcov.gg.SSI1,
+                    vcov.gg.conc1,
+                    
+                    vcov.gg.UIIC2,
+                    vcov.gg.SSDI2,
+                    vcov.gg.SSI2,
+                    vcov.gg.conc2)
+          )
+
 
 # stargazer(reg_gg.UIIC, reg_gg.SSDI, reg_gg.SSI, reg_gg_conc,  align = TRUE,
 #           title = seaStr.gg_title,
@@ -2355,17 +2447,6 @@ summary_white1 <- function(x) summary(x, vcov = function(y) vcovHC(y, method = "
 
 
 
-seaStr.gg_depvarNames <- c("UI initial", "SSID", "SSI", "Concurrent") 
-seaStr.gg_covarNames  <- c("Sea. Strength of unemployment", "Anuual average temp.")  
-seaStr.gg_title <- "Regression results: seasonal strength"  
-
-
-stargazer(reg_gg.UIIC, reg_gg.SSDI, reg_gg.SSI, reg_gg.conc,  align = TRUE, type = "text",
-          title = seaStr.gg_title,
-          dep.var.labels= seaStr.gg_depvarNames,
-          covariate.labels= seaStr.gg_covarNames
-          )
-
 
 
 ## Lables 
@@ -2619,7 +2700,7 @@ df_reg_pattern <-
            SSI_s3to5  = (SSI_s3  + SSI_s4  + SSI_s5)/3,
            conc_s3to5 = (conc_s3 + conc_s4 + conc_s5)/3,
            
-           unemply_s1to3 = (unemply_s1 + unemply_s2 + unemply_s3)/3,
+           unemply_s1to3 = (unemply_s3 + unemply_s4 + unemply_s5)/3,
            
            
            # SSDI_pattern1 = SSDI_s3 / SSDI_s8,
@@ -2679,48 +2760,92 @@ library(ggrepel)
 seed_repel <- 1234
 
 
+df_reg_pattern_con48 <- 
+  df_reg_pattern1 %>% filter(!State %in% c("AK", "HI", "DC"))
+
+
 # unemployment
+(reg <- 
+  df_reg_pattern_con48 %>% 
+  lm(unemply_s1to3~ tempF_1to3, data = .) %>% 
+  summary)
+
+slope <- round(reg$coefficients[2,1], 4)
+r2    <- round(reg$r.squared, 2)
+corcoef <- round(with(df_reg_pattern_con48, cor(unemply_s1to3, tempF_1to3)), 2)
+
+fig_text <- glue("Slope = {slope} (p<0.01)\nR-squared = {r2}\nCorrelation = {corcoef} ")
+
 fig_peak1_unemp <-   
   df_reg_pattern1 %>%
   #filter(!State %in% c("AK")) %>%
   ggplot(aes(x = tempF_1to3, y = unemply_s1to3, label = State)) + theme_bw() + 
   geom_point() + 
   geom_text_repel(size = 3, seed = seed_repel) + 
-  geom_smooth(method='lm') + 
+  geom_smooth(method='lm', data = filter(df_reg_pattern1, !State %in% c("AK", "HI", "DC"))) + 
   geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
   coord_cartesian(ylim = c(0.9, 1.25)) + 
+  annotate("text", x = 55, y = 1.21, label = fig_text,  size = 3.5) +
   scale_x_continuous(breaks=seq(-100, 100, 10)) + 
   scale_y_continuous(breaks=seq(0, 3, 0.05)) + 
   labs(title = "Jan-Mar peak of unemployment",
        x = "Average temperature (F)",
        y = "Average seasonal factor")
+fig_peak1_unemp 
+
 
 # SSDI 
+(reg <- 
+  df_reg_pattern_con48 %>% 
+  lm(SSDI_s3to5~ tempF_3to5, data = .) %>% 
+  summary)
+
+slope <- round(reg$coefficients[2,1], 4)
+r2    <- round(reg$r.squared, 2)
+corcoef <- round(with(df_reg_pattern_con48, cor(SSDI_s3to5, tempF_3to5)), 2)
+
+fig_text <- glue("Slope = {slope} (p<0.01)\nR-squared = {r2}\nCorrelation = {corcoef} ")
+
 fig_peak1_SSDI <- 
   df_reg_pattern1 %>%
   #filter(!State %in% c("AK")) %>%
   ggplot(aes(x = tempF_3to5, y = SSDI_s3to5, label = State)) + theme_bw() +
   geom_point() + 
   geom_text_repel(size = 3, seed = seed_repel) + 
-  geom_smooth(method='lm') +
-   geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
+  geom_smooth(method='lm', data = filter(df_reg_pattern1, !State %in% c("AK", "HI", "DC"))) +
+  geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
   coord_cartesian(ylim = c(0.9, 1.25)) + 
+  annotate("text", x = 65, y = 1.21, label = fig_text,  size = 3.5) +
   scale_x_continuous(breaks=seq(-100, 100, 10)) + 
   scale_y_continuous(breaks=seq(0, 3, 0.05)) + 
   
   labs(title = "Mar-May peak of SSDI only applications",
        x = "Average temperature (F)",
        y = "Average seasonal factor")
+fig_peak1_SSDI 
+
 
 # UIIC  
+(reg <- 
+  df_reg_pattern_con48 %>% 
+  lm(UIIC_s12to1~ tempF_12to1, data = .) %>% 
+  summary)
+
+slope <- round(reg$coefficients[2,1], 4)
+r2    <- round(reg$r.squared, 2)
+corcoef <- round(with(df_reg_pattern_con48, cor(UIIC_s12to1, tempF_12to1)), 2)
+
+fig_text <- glue("Slope = {slope} (p<0.01)\nR-squared = {r2}\nCorrelation = {corcoef} ")
+
 fig_peak1_UIIC <- 
   df_reg_pattern1 %>%
   #filter(!State %in% c("AK")) %>%
   ggplot(aes(x = tempF_12to1, y = UIIC_s12to1, label = State )) + theme_bw() +
   geom_point() + 
   geom_text_repel(size = 3, seed = seed_repel) + 
-  geom_smooth(method='lm') +
-   geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
+  geom_smooth(method='lm', data = filter(df_reg_pattern1, !State %in% c("AK", "HI", "DC"))) +
+  geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
+  annotate("text", x = 54, y = 1.8, label = fig_text,  size = 3.5) +
   coord_cartesian(ylim = c(0.5, 1.9)) + 
   scale_x_continuous(breaks=seq(-100, 100, 10)) + 
   scale_y_continuous(breaks=seq(0, 3, 0.1)) + 
@@ -2728,18 +2853,32 @@ fig_peak1_UIIC <-
        title = "Dec-Jan peak of UI initial claims",
        x = "Average temperature (F)",
        y = "Average seasonal factor")
-    
+fig_peak1_UIIC    
+
 
 
 ## Summer peak
 
 # unemployment
+
+(reg <- 
+  df_reg_pattern_con48 %>% 
+  lm(unemply_s7 ~ tempF_7, data = .) %>% 
+  summary)
+
+slope <- round(reg$coefficients[2,1], 4)
+r2    <- round(reg$r.squared, 2)
+corcoef <- round(with(df_reg_pattern_con48, cor(unemply_s7, tempF_7)), 2)
+
+fig_text <- glue("Slope = {slope} (p<0.01)\nR-squared = {r2}\nCorrelation = {corcoef} ")
+
 fig_peak2_unemp <- 
   df_reg_pattern1 %>%
   filter(!State %in% c("AK")) %>%
-  ggplot(aes(x = tempF_7to8, y = unemply_s7, label = State )) + theme_bw() +
+  ggplot(aes(x = tempF_7, y = unemply_s7, label = State )) + theme_bw() + 
   geom_point() + 
-  geom_smooth(method='lm')+ 
+  geom_smooth(method='lm', data = df_reg_pattern_con48)+ 
+  annotate("text", x = 81, y = 1.21, label = fig_text,  size = 3.5) +
   geom_text_repel(size = 3, seed = seed_repel) + 
   geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
   coord_cartesian(ylim = c(0.9, 1.25)) + 
@@ -2751,8 +2890,23 @@ fig_peak2_unemp <-
        x = "Average temperature (F)",
        y = "Average seasonal factor")
 
+fig_peak2_unemp 
+
+
 
 # SSDI
+
+(reg <- 
+  df_reg_pattern_con48 %>% 
+  lm(SSDI_s8 ~ tempF_8, data = .) %>% 
+  summary)
+
+slope <- round(reg$coefficients[2,1], 4)
+r2    <- round(reg$r.squared, 2)
+corcoef <- round(with(df_reg_pattern_con48, cor(SSDI_s8, tempF_8)), 2)
+
+fig_text <- glue("Slope = {slope} (p<0.01)\nR-squared = {r2}\nCorrelation = {corcoef} ")
+
 fig_peak2_SSDI <- 
   df_reg_pattern1 %>%
   filter(!State %in% c("AK")) %>%
@@ -2761,29 +2915,47 @@ fig_peak2_SSDI <-
   geom_smooth(method='lm')+ 
   geom_text_repel(size = 3, seed = seed_repel) + 
   geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
-  coord_cartesian(ylim = c(0.9, 1.2)) + 
+  annotate("text", x = 81, y = 1.21, label = fig_text, size = 3.5) +
+  coord_cartesian(ylim = c(0.9, 1.25)) + 
   scale_x_continuous(breaks=seq(-100, 100, 5)) + 
   scale_y_continuous(breaks=seq(0, 3, 0.05)) + 
   labs(
        title = "Aug peak of SSDI only applications",
        x = "Average temperature (F)",
        y = "Average seasonal factor")
+fig_peak2_SSDI
+
+
 
 
 # UIIC
+
+(reg <- 
+  df_reg_pattern_con48 %>% 
+  lm(UIIC_s7 ~ tempF_7, data = .) %>% 
+  summary)
+
+slope <- round(reg$coefficients[2,1], 4)
+r2    <- round(reg$r.squared, 2)
+corcoef <- round(with(df_reg_pattern_con48, cor(UIIC_s7, tempF_7)), 2)
+
+fig_text <- glue("Slope = {slope} (p<0.01)\nR-squared = {r2}\nCorrelation = {corcoef} ")
+
+
 fig_peak2_UIIC <- 
   df_reg_pattern1 %>%
   filter(!State %in% c("AK")) %>%
-  ggplot(aes(x = tempF_7to8, y = UIIC_s7, label = State )) + theme_bw() +
+  ggplot(aes(x = tempF_7, y = UIIC_s7, label = State )) + theme_bw() +
   geom_point() + 
   geom_smooth(method='lm') + 
   geom_text_repel(size = 3, seed = seed_repel) + 
   geom_hline(yintercept = 1, linetype = 2, color = "gray70") + 
+  annotate("text", x = 81, y = 1.8, label = fig_text,  size = 3.5) +
   coord_cartesian(ylim = c(0.5, 1.9)) + 
   scale_x_continuous(breaks=seq(-100, 100, 5)) + 
   scale_y_continuous(breaks=seq(0, 3, 0.1)) + 
   labs(
-       title = "Jul peak of UI initial claims",
+       title = "Jul-Aug peak of UI initial claims",
        x = "Average temperature (F)",
        y = "Average seasonal factor")
 
@@ -2801,9 +2973,9 @@ fig_peaks_UIIC <-
     list(fig_peak1_UIIC, fig_peak2_UIIC), nrow = 1, ncol = 2, top = "UI initial claims")
 
 
-fig_peaks_unemp
-fig_peaks_SSDI
-fig_peaks_UIIC
+# fig_peaks_unemp
+# fig_peaks_SSDI
+# fig_peaks_UIIC
 
 ggsave(
   paste0(plot.path, "fig_newVer/fig_peaksTemp_unemp.png"), 

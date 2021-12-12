@@ -219,6 +219,31 @@ df_outOnly_N <-
   relocate(State, Title.2, Title.16, Concurrent)
 
 
+df_outOnly_N %>% 
+	mutate(across(everything(), ~ifelse(is.na(.x), 0, .x)),
+				 ol_app = as.logical(Title.2 + Title.16 + Concurrent)) %>% 
+	filter(State %in% c(state.abb, "DC")) %>% 
+	ungroup %>% 
+	summarise(Title.2 = sum(Title.2),
+						Title.16 = sum(Title.16),
+						Concurrent = sum(Concurrent),
+						ol_app = sum(ol_app))
+
+df <- 
+df_outOnly_N %>% 
+	filter(State %in% c(state.abb, "DC")) %>% 
+	mutate(across(everything(), ~ifelse(is.na(.x), 0, .x)),
+				 ol_app = as.logical(Title.2 + Title.16 + Concurrent)) %>% 
+	ungroup
+
+count(df,Title.2)
+count(df,Title.16)
+count(df,Concurrent)
+
+
+
+
+
 
 
 
