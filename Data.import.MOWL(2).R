@@ -342,7 +342,7 @@ all = transform(all, Total      = Total.o*adj.factor,
 
 
 ## Adjusting data error in 2014:11: application, determiniation and allowance are the same for SSI and concurrent. 
-# TODO check if the error still exist in the latest data:last checked with MOWL-2021-08, issue still exists
+# TODO check if the error still exist in the latest data:last checked with MOWL-2021-11, issue still exists
 # Note tha only all is adjusted. 
 
 all <- 

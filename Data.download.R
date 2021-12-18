@@ -11,6 +11,10 @@
 #   - Lastest data release: Sep 3, 2021
 #   - Data up to 8-2021
 
+## Checked on Dec 11, 2021
+#   - Lastest data release: Dec 12, 2021
+#   - Data up to 11-2021
+
 
 dir_data <- "Data/"
 
@@ -20,8 +24,12 @@ dir_data <- "Data/"
 
 
 # Date of downloading: 10/15/2021. up to 2021-08
-download.file("https://www.ssa.gov/disability/data/SSA-SA-MOWL.xls", paste0(dir_data, "/MOWL/SSA-SA-MOWL-2021-08.xls"))
-download.file("https://www.ssa.gov/disability/data/SSA-SA-MOWL.csv", paste0(dir_data, "/MOWL/SSA-SA-MOWL-2021-08.csv"))
+# download.file("https://www.ssa.gov/disability/data/SSA-SA-MOWL.xls", paste0(dir_data, "/MOWL/SSA-SA-MOWL-2021-08.xls"))
+# download.file("https://www.ssa.gov/disability/data/SSA-SA-MOWL.csv", paste0(dir_data, "/MOWL/SSA-SA-MOWL-2021-08.csv"))
+
+# Date of downloading: 12/12/2021. up to 2021-11
+download.file("https://www.ssa.gov/disability/data/SSA-SA-MOWL.xls", paste0(dir_data, "/MOWL/SSA-SA-MOWL-2021-11.xls"))
+download.file("https://www.ssa.gov/disability/data/SSA-SA-MOWL.csv", paste0(dir_data, "/MOWL/SSA-SA-MOWL-2021-11.csv"))
 
 
 ## Date translation table. Date of downloading: 5/9/2021 (data release 2021/1/19)
