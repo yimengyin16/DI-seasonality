@@ -1,0 +1,904 @@
+---
+title: "Counterfactual analysis for COVID-19"
+output:
+  pdf_document:
+    includes:
+      in_header: LatexPreamble.sty
+    number_sections: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r preamble, echo=FALSE, include=FALSE}
+
+library(plyr)
+library(ggplot2)
+library(scales)
+library(xtable)
+#library(DataCombine) # it loads dplyr!
+library(magrittr)
+library("tidyr")
+library("knitr")
+library(lubridate)
+library(tsibble)
+library(fable)
+library(feasts)
+library(dplyr)
+library(purrr)
+library(grid)
+library(gridExtra)
+library(seasonal)
+
+options(xtable.include.rownames = F,
+        xtable.booktabs = T,
+        xtable.caption.placement = "top")
+
+
+source("General.R")
+# source("Forecasting.main.R")
+
+load("Data/Panel.RData")
+
+plot.path = "paper_plot/"
+dir.fig_newVer = "paper_plot/fig_newVer/"
+
+
+## Data adjusted and unadjusted for outliers
+Panel %<>% mutate(State = as.character(State),
+                  Region = as.character(Region),
+                  Formatted.Date = as.character(Formatted.Date)) 
+
+Panel_unadj %<>% mutate(State = as.character(State),
+                        Region = as.character(Region),
+                        date_yearmon =  as.yearmon(Formatted.Date)) 
+
+# Panel %>% names
+
+
+## Adding regional totals for applications
+Panel_region <- 
+  Panel %>% 
+  filter(!Region %in% c("AG", "NW", "A8", "A9")) %>% 
+  group_by(Region, date_yearmon) %>% 
+  summarise(State = unique(Region),
+            #index = unique(index),
+            Cal.year = unique(Cal.Year),
+            Month    = unique(Month),
+            Formatted.Date = unique(Formatted.Date),
+            No.week = unique(No.week),
+            
+            Title.2    = sum(Title.2, na.rm = TRUE),
+            Title.16   = sum(Title.16, na.rm = TRUE),
+            Concurrent = sum(Concurrent, na.rm = TRUE),
+            
+            Det.Title.2    = sum(Det.Title.2, na.rm = TRUE),
+            Det.Title.16   = sum(Det.Title.16, na.rm = TRUE),
+            Det.Concurrent = sum(Det.Concurrent, na.rm = TRUE),
+            
+            Allow.Title.2    = sum(Allow.Title.2, na.rm = TRUE),
+            Allow.Title.16   = sum(Allow.Title.16, na.rm = TRUE),
+            Allow.Concurrent = sum(Allow.Concurrent, na.rm = TRUE),
+            
+            unemply_U    = sum(unemply_U, na.rm = TRUE),
+            unemply_S    = sum(unemply_S, na.rm = TRUE),
+            
+            uRate_U    = mean(uRate_U, na.rm = TRUE),
+            uRate_S    = mean(uRate_S, na.rm = TRUE),
+            
+            UIIC    = sum(UIIC, na.rm = TRUE),
+            UICC    = sum(UICC, na.rm = TRUE),
+            
+            jobOpen_u    = sum(jobOpen_u, na.rm = TRUE),
+            jobOpen_s    = sum(jobOpen_s, na.rm = TRUE),
+            
+            jobOpenRate_u    = mean(jobOpenRate_u, na.rm = TRUE),
+            jobOpenRate_s    = mean(jobOpenRate_s, na.rm = TRUE),
+            
+            emplyMon_tot          = sum(emplyMon_tot,          na.rm = TRUE), 
+            emplyMon_construction = sum(emplyMon_construction, na.rm = TRUE),
+            emplyMon_gov          = sum(emplyMon_gov,          na.rm = TRUE),
+            emplyMon_leisure      = sum(emplyMon_leisure,      na.rm = TRUE),
+            emplyMon_mining       = sum(emplyMon_mining,       na.rm = TRUE),
+            emplyMon_trade        = sum(emplyMon_trade,        na.rm = TRUE),
+            
+            .groups = "drop"
+            ) %>% 
+  mutate(AllowRate.Title.2    = Allow.Title.2 / Det.Title.2,
+         AllowRate.Title.16   = Allow.Title.16 / Det.Title.16,
+         AllowRate.Concurrent = Allow.Concurrent / Det.Concurrent,
+         lunemply_U = log(unemply_U),
+         lunemply_S = log(unemply_S)
+         )
+
+
+Panel <- 
+  bind_rows(Panel, 
+            Panel_region) %>% 
+  as_tibble() %>% 
+  mutate(emplyMon_high5   =  emplyMon_construction + emplyMon_mining + emplyMon_leisure + emplyMon_trade + emplyMon_gov,
+         emplyMon_modest2 =  emplyMon_mining + emplyMon_leisure,
+         emplyMon_modest4 =  emplyMon_mining + emplyMon_leisure + emplyMon_trade + emplyMon_gov,
+         
+         lemplyMon_tot          = log(emplyMon_tot), 
+         lemplyMon_construction = log(emplyMon_construction),
+         lemplyMon_gov          = log(emplyMon_gov),
+         lemplyMon_leisure      = log(emplyMon_leisure),
+         lemplyMon_mining       = log(emplyMon_mining),
+         lemplyMon_trade        = log(emplyMon_trade),
+         
+         lemplyMon_high5   =  log(emplyMon_high5),
+         lemplyMon_modest2 =  log(emplyMon_modest2),
+         lemplyMon_modest4 =  log(emplyMon_modest4)
+         )
+
+## Adding index
+df_idx <- 
+  Panel %>% filter(State == "NW") %>% 
+  dplyr::select(date_yearmon) %>% 
+  mutate(index = 1:n())
+       
+Panel       <- left_join(Panel,       df_idx, by = "date_yearmon")
+Panel_unadj <- left_join(Panel_unadj, df_idx, by = "date_yearmon")
+
+
+#Panel
+Panel_all <- Panel
+Panel     <- filter(Panel,date_yearmon <= "2020-2")
+
+Panel_unadj_all <- Panel_unadj
+Panel_unadj     <- filter(Panel_unadj,date_yearmon <= "2020-2")
+
+
+# Key variables for the paper
+{
+##' Disability applications
+#    - Title.2
+#    - Title.16
+#    - Concurrent
+#    - Total
+
+##' Disability applications allowance (number)
+#    - Allow.Title.2
+#    - Allow.Title.16
+#    - Allow.Concurrent
+#    - Allow.Total
+
+##' Disability applications allowance rate (%)
+#    - AllowRate.Title.2
+#    - AllowRate.Title.16
+#    - AllowRate.Concurrent
+#    - AllowRate.Total
+
+
+##' Unemployment and unemployment rate
+#    -emply_S: unemployment, seasonally adjusted
+#    -emply_U: unemployment, non-seasonally adjusted
+#    -URate_S: unemployment rate, seasonally adjusted
+#    -URate_U: unemployment rate, non-seasonally adjusted
+#    Note: BLS data based on CPS
+
+
+##' UI application
+#    - UIIC: UI initial claims,  adjusted for # of weeks in SSA months
+#    - UICC: UI continued claims, adjusted for # of weeks in SSA months
+#    - UIIC_unadj, UICC_unadj: versions not adjusted for # of weeks in SSA months
+
+
+# Indices:
+#   - State
+#   - index
+#   - Cal.Year
+#   - Month  (numeric)
+#   - date_yearmon (yearmon)
+#   - Formatted.Date
+#   - Region
+}
+
+
+
+```
+
+
+# Counter factual analysis ver1
+
+## Plots for all states (exploratory)
+```{r}
+
+# Function for plotting projected vs actual applications for three types, 
+# each in one plot
+
+panel_ts1 <- 
+  Panel_all %>% 
+  mutate(date_yearmon = yearmonth(date_yearmon)) %>% 
+  rename(idx = index) %>%  
+  tsibble(key = State, index = date_yearmon) 
+
+
+df.test <- 
+  panel_ts %>% 
+  dplyr::select(State, date_yearmon, Title.2, Title.16, Concurrent) %>% 
+  mutate(across(c(Title.2, Title.16, Concurrent), as.numeric ))
+
+
+plot_counterFct <- function(state_slc){
+
+state_slc <- "AG"
+  
+df.test.AG <- 
+  df.test %>% 
+  filter(State == state_slc,
+         date_yearmon <= yearmonth("2020-02"))
+
+
+# Producing forecasts using ETS
+fit.AG.DI <- 
+  df.test.AG %>% 
+  model(ETS(Title.2  ~ error("M") + trend("Ad") + season("M")))
+
+
+fit.AG.SSI <- 
+  df.test.AG %>% 
+  model(ETS(Title.16  ~ error("M") + trend("Ad") + season("M")))
+
+fit.AG.concurrent <- 
+  df.test.AG %>% 
+  model(ETS(Concurrent  ~ error("M") + trend("Ad") + season("M")))
+
+
+fc.AG.DI         <- fabletools::forecast(fit.AG.DI, h = 14)
+fc.AG.SSI        <- fabletools::forecast(fit.AG.SSI, h = 14)
+fc.AG.concurrent <- fabletools::forecast(fit.AG.concurrent, h = 14)
+
+max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
+
+
+
+fig_DI <- 
+fc.AG.DI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.2), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") +
+  coord_cartesian(ylim = c(0, max_y)) + 
+  labs(title = paste0(state_slc, ": SSDI"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+  theme(legend.position = "bottom")
+
+fig_SSI <- 
+fc.AG.SSI %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Title.16), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, max_y)) +
+  labs(title = paste0(state_slc, ": SSI"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+   theme(legend.position = "bottom")
+  
+fig_concurrent <- 
+fc.AG.concurrent %>% 
+  autoplot(df.test.AG %>% filter(date_yearmon >= yearmonth("2008-01"))) + 
+  geom_line(aes(x = date_yearmon, y = Concurrent), 
+            data = panel_ts %>% filter(State == state_slc, date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, max_y)) + 
+  labs(title = paste0(state_slc, ": Concurrent"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL) +
+   theme(legend.position = "bottom")
+
+
+marrangeGrob(list(fig_DI, fig_SSI, fig_concurrent), ncol = 3, nrow = 1)
+
+}
+
+
+fig_AG <- plot_counterFct("AG")
+fig_CA <- plot_counterFct("CA")
+fig_TX <- plot_counterFct("TX")
+fig_NY <- plot_counterFct("NY")
+fig_FL <- plot_counterFct("FL")
+fig_PA <- plot_counterFct("PA")
+fig_NC <- plot_counterFct("NC")
+fig_WI <- plot_counterFct("WI")
+
+
+cairo_pdf(paste0(plot.path, "counterFct1.pdf"), width = 20, height = 5.6, onefile = T)
+fig_AG
+fig_CA
+fig_TX
+fig_NY
+fig_FL
+fig_PA
+fig_NC
+fig_WI
+dev.off()
+
+
+# ggsave("text.pdf",  width = 10, height = 4, scale = 1.4)
+
+```
+
+
+
+
+
+## **paper** total level 
+```{r}
+
+
+ls_ets <- readRDS("Data/intermed_ets.rds")
+mod_ets <-  ls_ets$mod_ets
+df_comp_ets <- ls_ets$df_comp_ets
+
+
+# US total, level, forecast vs actual
+
+fit_SSDI <- filter(mod_ets$SSDI, State == "AG")$SSDI[[1]] 
+fit_SSI  <- filter(mod_ets$SSI, State == "AG")$SSI[[1]] 
+fit_concurrent <- filter(mod_ets$conc, State == "AG")$conc[[1]] 
+
+#%>% fabletools::forecast(h = 14)
+
+fcst_SSDI       <- fabletools::forecast(fit_SSDI, h = 21)
+fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 21)
+fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 21)
+
+# max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
+
+
+fig_fcst_SSDI <- 
+autoplot(fcst_SSDI,
+  panel_ts %>% 
+  filter(State == "AG",
+         date_yearmon <= yearmonth("2020-02"),
+         date_yearmon >= yearmonth("2018-01")) %>% 
+  mutate(y = Title.2) %>% 
+  update_tsibble(key = NULL)) + theme_bw() + 
+  geom_line(aes(x = date_yearmon, y = Title.2), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 110000)) + 
+  scale_y_continuous(breaks = seq(0, 200000, 25000)) + 
+  # scale_x_date(breaks = as.Date(c("2021-01-01"))) +
+  labs(title = paste0("SSDI only applications"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL,
+       y = NULL) +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(size = 8))
+
+
+
+fig_fcst_SSI <- 
+ autoplot(fcst_SSI,
+  panel_ts %>% 
+    filter(State == "AG",
+           date_yearmon <= yearmonth("2020-02"),
+           date_yearmon >= yearmonth("2018-01")) %>% 
+    mutate(y = Title.16) %>% 
+  update_tsibble(key = NULL)
+  ) + theme_bw() + 
+  geom_line(aes(x = date_yearmon, y = Title.16), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 110000)) + 
+  scale_y_continuous(breaks = seq(0, 200000, 25000)) + 
+  labs(title = paste0("SSI only applications"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL,
+       y = NULL) +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(size = 8))
+
+
+fig_fcst_concurrent <- 
+autoplot(fcst_concurrent,
+  panel_ts %>% 
+    filter(State == "AG",
+           date_yearmon <= yearmonth("2020-02"),
+           date_yearmon >= yearmonth("2018-01")) %>% 
+    mutate(y = Concurrent) %>% 
+  update_tsibble(key = NULL)
+  ) + theme_bw() + 
+  geom_line(aes(x = date_yearmon, y = Concurrent), 
+            data = panel_ts %>% filter(State == "AG", date_yearmon >= yearmonth("2020-03")),
+            color = "red") + 
+  coord_cartesian(ylim = c(0, 110000)) + 
+  scale_y_continuous(breaks = seq(0, 200000, 25000)) + 
+  labs(title = paste0("Concurrent applications"),
+       subtitle = "ETS forecast vs actual",
+       x = NULL,
+       y = NULL) +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(size = 8))
+
+
+fig_fcst_SSDI
+fig_fcst_SSI
+fig_fcst_concurrent
+
+fig_fcast_DI_US <- 
+  marrangeGrob(list(fig_fcst_SSDI,fig_fcst_SSI, fig_fcst_concurrent), 
+               ncol = 3, nrow = 1,
+               top = NULL
+                )
+
+
+ggsave(fig_fcast_DI_US, filename = paste0(dir.fig_newVer, "fig_counterFct_US.png"),
+       width = 11*1.1, height = 4.3*1.1)
+
+
+
+
+```
+
+
+## **paper** seasonal pattern
+```{r}
+
+
+## How Covid affected DI seasonality v1: use average seasonal factor from forecast
+
+df_covid <-
+  panel_ts %>% 
+  filter(State == "AG", date_yearmon >= yearmonth("2020-03")) %>% 
+  dplyr::select(State, date_yearmon, SSDI = Title.2, SSI = Title.16, Concurrent = Concurrent ) %>% 
+  update_tsibble(key = NULL) %>% 
+  left_join(dplyr::select(as_tsibble(fcst_SSDI),       date_yearmon, SSDI_fcst = .mean), by = "date_yearmon") %>% 
+  left_join(dplyr::select(as_tsibble(fcst_SSI),        date_yearmon, SSI_fcst = .mean), by = "date_yearmon") %>% 
+  left_join(dplyr::select(as_tsibble(fcst_concurrent), date_yearmon, Concurrent_fcst = .mean), by = "date_yearmon")
+
+
+df_covid2 <- 
+  df_covid %>% 
+  gather(Var, value, -State, -date_yearmon) %>% 
+  filter(date_yearmon >= yearmonth("2020-05")) %>% 
+  as_tibble %>% 
+  group_by(Var) %>% 
+  mutate(avg = mean(value, na.rm = TRUE),
+         season = value / avg,
+         VarType = str_extract(Var, "SSDI|SSI|Concurrent"))
+
+
+fig_counterFct_season <- 
+  df_covid2 %>% 
+  mutate(DItype = str_extract(Var, "SSDI|SSI|Concurrent"),
+         DItype = factor(DItype, c("SSDI", "SSI", "Concurrent"),
+                                 c("SSDI only", "SSI only", "Concurrent")),
+         vartype = ifelse(str_detect(Var, "fcst"), "Forecast", "Actual")) %>% 
+  ggplot(aes(x = date_yearmon, y = season, color = vartype)) + theme_bw() + 
+  facet_grid(~DItype) + 
+  geom_line(linetype = 5) +
+  geom_point() + 
+  geom_hline(yintercept = 1, color = "grey 80") + 
+  scale_color_manual(values = c("blue", "red")) + 
+  labs(x = NULL,
+       y = "Seasonal factor (multiplicative)",
+       color = NULL) + 
+  theme(legend.position = "bottom")
+fig_counterFct_season
+
+# ggsave(fig_counterFct_season, filename = paste0(dir.fig_newVer, "fig_counterFct_season_US.png"), 
+#        width = 12, height = 4.6)
+
+
+
+## How Covid affected DI seasonality v2: use estimated seasonal factor from the model
+
+df_covid <-
+  panel_ts %>% 
+  filter(State == "AG", date_yearmon >= yearmonth("2020-03")) %>% 
+  dplyr::select(State, date_yearmon, SSDI = Title.2, SSI = Title.16, Concurrent = Concurrent ) %>% 
+  update_tsibble(key = NULL)
+
+
+df_covid2 <- 
+  df_covid %>% 
+  gather(Var, value, -State, -date_yearmon) %>% 
+  filter(date_yearmon >= yearmonth("2020-05")) %>% 
+  as_tibble %>% 
+  group_by(Var) %>% 
+  mutate(avg = mean(value, na.rm = TRUE),
+         season_actual = value / avg,
+         DIType = str_extract(Var, "SSDI|SSI|Concurrent"),
+         Month = month(date_yearmon)) %>% 
+  ungroup() %>% 
+  dplyr::select(DIType, Month, date_yearmon , season_actual)
+
+
+df_season_mod <- 
+  df_season_avg %>% 
+  filter(State == "US",
+         .model %in% c("SSDI", "SSI", "conc")
+  ) %>% 
+  rename(season_model = season_avg,
+         DIType = .model) %>% 
+  ungroup %>% 
+  mutate(DIType = ifelse(DIType == "conc", "Concurrent", DIType),
+         State   = NULL)
+
+df_covid2 <- 
+  left_join(df_covid2, df_season_mod, by = c("Month", "DIType")) %>% 
+  gather(VarType, season, -DIType, -Month, -date_yearmon) %>% 
+  mutate(DIType = str_extract(DIType, "SSDI|SSI|Concurrent"),
+         DIType = factor(DIType, c("SSDI", "SSI", "Concurrent"),
+                                 c("SSDI only", "SSI only", "Concurrent")),
+         VarType = factor(VarType, c("season_model", "season_actual"), 
+                                   c("Model", "Actual"))
+         )
+
+
+
+
+fig_counterFct_season2 <- 
+  df_covid2  %>% 
+  ggplot(aes(x = date_yearmon, y = season, color = VarType)) + theme_bw() + 
+  facet_grid(~DIType) + 
+  geom_line(linetype = 5) +
+  geom_point() + 
+  geom_hline(yintercept = 1, color = "grey 80") + 
+  scale_color_manual(values = c("grey50", "red")) + 
+  coord_cartesian(ylim = c(0.78, 1.22)) +
+  labs(x = NULL,
+       y = "Seasonal factor",
+       color = NULL) + 
+  theme(legend.position = "bottom")
+fig_counterFct_season2
+
+# ggsave(fig_counterFct_season2, filename = paste0(dir.fig_newVer, "fig_counterFct_season2_US.png"), 
+#        width = 12, height = 4.6)
+
+
+
+
+## V3 How Covid affected DI seasonality: use estimated seasonal factor from the model and CiSSA non-seasonal components
+
+df_covid <-
+  panel_ts %>% 
+  filter(State == "NW", date_yearmon >= yearmonth("2020-03")) %>% 
+  dplyr::select(State, date_yearmon, Cal.Year, Month, SSDI = Title.2, SSI = Title.16, Concurrent = Concurrent ) %>% 
+  update_tsibble(key = NULL)
+
+
+df_season_mod <- 
+  df_season_avg %>% # generated in "Plots for paper, DI and unemployment"
+  filter(State == "US+", # corespond to NW in panel_ts
+         .model %in% c("SSDI", "SSI", "conc")
+  ) %>% 
+  rename(season_model = season_avg,
+         DIType = .model) %>% 
+  ungroup %>% 
+  mutate(DIType = ifelse(DIType == "conc", "Concurrent", DIType),
+         State   = NULL) %>% 
+  spread(DIType, season_model) %>% 
+  rename(seas_model_SSDI = SSDI,
+         seas_model_SSI  = SSI,
+         seas_model_conc = Concurrent
+         )
+
+
+# load CiSSA results
+df_CiSSA <- readRDS("CiSSA/data_CiSSA.NW.rds")
+
+df_covid <- 
+  df_covid %>% 
+  left_join(df_CiSSA, by = c("State", "Cal.Year", "Month")) %>% 
+  left_join(df_season_mod, by = "Month")
+  
+
+df_covid
+
+# Construct the following variable
+df_covid %<>% 
+  mutate(
+    # CiSSA non-seasonal components
+    SSDI_rc.nonSeas = SSDI_rc.trend + SSDI_rc.cycle,
+    SSI_rc.nonSeas  = SSI_rc.trend  + SSI_rc.cycle,
+    conc_rc.nonSeas = conc_rc.trend + conc_rc.cycle,
+    
+    # actual values over CiSSA non-seasonal values
+    seas_actual_SSDI = SSDI / SSDI_rc.nonSeas, 
+    seas_actual_SSI  = SSI  /  SSI_rc.nonSeas, 
+    seas_actual_conc = Concurrent / conc_rc.nonSeas, 
+    
+    # CiSSA total rc over CiSSA non-seasonal values
+    seas_cissa_SSDI = (SSDI_rc.nonSeas + SSDI_rc.seasonal) / SSDI_rc.nonSeas, 
+    seas_cissa_SSI  = (SSI_rc.nonSeas  + SSI_rc.seasonal)  / SSI_rc.nonSeas, 
+    seas_cissa_conc = (conc_rc.nonSeas + conc_rc.seasonal) / conc_rc.nonSeas  
+  )
+
+
+df_covid_fig <- 
+  df_covid %>% 
+  select(date_yearmon, 
+         contains("seas_")) %>% 
+  gather(varName, value,  -date_yearmon) %>% 
+  mutate(DItype  = str_extract(varName, "SSDI|SSI|conc"),
+         varType = str_remove(varName, "_SSDI|_SSI|_conc")
+         ) %>% 
+  filter(date_yearmon < yearmonth("2021-08"))
+
+
+fig_counterFct_season3 <- 
+df_covid_fig %>% 
+  mutate(varType = factor(varType, levels = c("seas_model", "seas_cissa", "seas_actual"),
+                                   labels = c("Pre-COVID: ETS seasonal",
+                                              "COVID: CiSSA seasonal",
+                                              "COVID: Actual value \ndivided by CiSSA trend+cycle")
+                          ),
+         DItype = factor(DItype, c("SSDI", "SSI", "conc"),
+                                 c("SSDI only", "SSI only", "Concurrent")),
+         
+         ) %>% 
+  
+  ggplot(aes(x = date_yearmon, y = value, color = varType)) + theme_bw() + 
+  facet_grid(.~DItype) + 
+  geom_point() + 
+  geom_line(linetype = 5) + 
+  geom_hline(yintercept = 1, color = "grey 80") + 
+  scale_color_manual(values = c("grey30", "red", "blue")) + 
+  labs(x = NULL,
+       y = "Seasonal factor",
+       color = NULL) + 
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+fig_counterFct_season3
+
+  
+ggsave(fig_counterFct_season3, filename = paste0(dir.fig_newVer, "fig_counterFct_season3_US.png"),
+       width = 12, height = 5)
+
+
+```
+
+
+
+## Counterfactual using X13
+
+```{r}
+# Extract seasonal factors using X13 ARIMA-SEATS procedure with different
+# specifications and assumptions on the impact of COVID-19
+
+## X13 manual https://www2.census.gov/software/x-13arima-seats/x-13-data/documentation/docx13as.pdf
+## "seasonal" r package
+#     CRAN document:  https://cran.r-project.org/web/packages/seasonal/seasonal.pdf
+#     website:        http://www.seasonal.website/seasonal.html
+#     feast function: https://feasts.tidyverts.org/reference/X_13ARIMA_SEATS.html#examples
+
+
+df <- 
+  Panel_all %>% 
+  filter(State == "NW") %>% 
+  select(State, date_yearmon, Formatted.Date, SSDI = Title.2, SSI = Title.16, conc = Concurrent) %>% 
+  mutate(SSDI  = ts(SSDI, start = c(2000,10), frequency = 12),
+         SSI   = ts(SSI, start = c(2000,10),  frequency = 12),
+         conc  = ts(conc, start = c(2000,10), frequency = 12)
+         )
+
+## Series to extract from X11 outputs
+#   d10: seasonal
+#   d11: seasonally adjusted 
+#   d12: trend
+#   d13: irregular
+   
+# Automatic X11
+m.SSDI = seas(df$SSDI, x11 = "", transform.function = "log", outlier.types = c("ao", "ls", "tc"))
+m.SSI  = seas(df$SSI,  x11 = "", transform.function = "log", outlier.types = c("ao", "ls", "tc"))
+m.conc = seas(df$conc, x11 = "", transform.function = "log", outlier.types = c("ao", "ls", "tc"))
+
+m.SSDI
+m.SSI
+m.conc
+
+series(m.SSDI,  c("d10","d11", "d12", "d13"))
+series(m.SSI,   c("d10","d11", "d12", "d13"))
+series(m.conc,  c("d10","d11", "d12", "d13"))
+
+series(m.SSDI, c("d10"))
+series(m.SSI,  c("d10"))
+series(m.conc, c("d10"))
+
+
+## models for comparison
+
+# 1. multiplicative, covid (May 2020) as LS (level shift)
+spec.x11m.ls <- list(x11 = "",
+                     transform.function = "log", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb", 
+                     regression.variables = c("ls2020.may", "ao2021.aug"))
+
+m.SSDI.x11m.ls <- seas(df$SSDI, list = spec.x11m.ls)
+m.SSI.x11m.ls  <- seas(df$SSI, list = spec.x11m.ls)
+m.conc.x11m.ls <- seas(df$conc, list = spec.x11m.ls)
+
+m.SSDI.x11m.ls  %>% summary
+m.SSI.x11m.ls   %>% summary
+m.conc.x11m.ls  %>% summary
+
+
+# 2. multiplicative, covid (May 2020) as tc (temporary change)
+spec.x11m.tc <- list(x11 = "", 
+                     transform.function = "log", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb",
+                     regression.variables = c("tc2020.may")
+                     )
+
+m.SSDI.x11m.tc <- seas(df$SSDI, list = spec.x11m.tc)
+m.SSI.x11m.tc <-  seas(df$SSI,  list = spec.x11m.tc)
+m.conc.x11m.tc <- seas(df$conc, list = spec.x11m.tc )
+
+m.SSDI.x11m.tc %>% summary
+m.SSI.x11m.tc  %>% summary
+m.conc.x11m.tc %>% summary
+
+
+
+# 3. additive, covid (May 2020) as LS (level shift)
+spec.x11a.ls <- list(x11 = "", 
+                     transform.function = "none", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb",
+                     regression.variables = c("ls2020.may")
+                     )
+
+m.SSDI.x11a.ls <- seas(df$SSDI, list = spec.x11a.ls)
+m.SSI.x11a.ls  <- seas(df$SSI,  list = spec.x11a.ls)
+m.conc.x11a.ls <- seas(df$conc, list = spec.x11a.ls)
+
+m.SSDI.x11a.ls  %>% summary
+m.SSI.x11a.ls   %>% summary
+m.conc.x11a.ls  %>% summary
+
+
+# 4. additive, covid (May 2020) as tc (temporary change)
+spec.x11a.tc <- list(x11 = "", 
+                     transform.function = "none", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb",
+                     regression.variables = c("tc2020.may")
+                     )
+
+m.SSDI.x11a.tc <- seas(df$SSDI, list = spec.x11a.tc)
+m.SSI.x11a.tc  <- seas(df$SSI,  list = spec.x11a.tc)
+m.conc.x11a.tc <- seas(df$conc, list = spec.x11a.tc)
+
+m.SSDI.x11a.tc  %>% summary
+m.SSI.x11a.tc   %>% summary
+m.conc.x11a.tc  %>% summary
+
+
+
+
+# 5. SEATS multiplicative, covid (May 2020) as LS (level shift)
+spec.seatsm.ls <- list(
+                     transform.function = "log", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb", 
+                     regression.variables = c("ls2020.may"))
+
+m.SSDI.seatsm.ls <- seas(df$SSDI, list = spec.seatsm.ls)
+m.SSI.seatsm.ls  <- seas(df$SSI,  list = spec.seatsm.ls)
+m.conc.seatsm.ls <- seas(df$conc, list = spec.seatsm.ls)
+
+m.SSDI.seatsm.ls  %>% summary
+m.SSI.seatsm.ls   %>% summary
+m.conc.seatsm.ls  %>% summary
+
+
+# 6. multiplicative, covid (May 2020) as tc (temporary change)
+spec.seatsm.tc <- list( 
+                     transform.function = "log", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb",
+                     regression.variables = c("tc2020.may")
+                     )
+
+m.SSDI.seatsm.tc <- seas(df$SSDI, list = spec.seatsm.tc)
+m.SSI.seatsm.tc <-  seas(df$SSI,  list = spec.seatsm.tc)
+m.conc.seatsm.tc <- seas(df$conc, list = spec.seatsm.tc )
+
+m.SSDI.seatsm.tc %>% summary
+m.SSI.seatsm.tc  %>% summary
+m.conc.seatsm.tc %>% summary
+
+
+
+# 7. additive, covid (May 2020) as LS (level shift)
+spec.seatsa.ls <- list(
+                     transform.function = "none", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb",
+                     regression.variables = c("ls2020.may")
+                     )
+
+m.SSDI.seatsa.ls <- seas(df$SSDI, list = spec.seatsa.ls)
+m.SSI.seatsa.ls  <- seas(df$SSI,  list = spec.seatsa.ls)
+m.conc.seatsa.ls <- seas(df$conc, list = spec.seatsa.ls)
+
+m.SSDI.seatsa.ls  %>% summary
+m.SSI.seatsa.ls   %>% summary
+m.conc.seatsa.ls  %>% summary
+
+
+# 8. additive, covid (May 2020) as tc (temporary change)
+spec.seatsa.tc <- list(
+                     transform.function = "none", 
+                     outlier.types = c("ao", "ls"),
+                     outlier.span  = "2000.oct, 2020.feb",
+                     regression.variables = c("tc2020.may")
+                     )
+
+m.SSDI.seatsa.tc <- seas(df$SSDI, list = spec.seatsa.tc)
+m.SSI.seatsa.tc  <- seas(df$SSI,  list = spec.seatsa.tc)
+m.conc.seatsa.tc <- seas(df$conc, list = spec.seatsa.tc)
+
+m.SSDI.seatsa.tc  %>% summary
+m.SSI.seatsa.tc   %>% summary
+m.conc.seatsa.tc  %>% summary
+
+
+
+spec <- list(
+             x11 = "", 
+             transform.function = "log", 
+             outlier.types = c("ao", "ls")
+             outlier.span  = "2000.oct, 2020.feb",
+             regression.variables = c("tc2020.may", "ao2021.aug")
+             )
+m  <- seas(df$SSI,  list = spec)
+
+series(m, "d11")
+series(m, "d10")
+
+
+
+
+
+
+
+
+
+
+
+
+
+series(m.SSDI.x11m.ls, "d11")
+series(m.SSDI.x11m.tc, "d11")
+
+
+
+series(m.SSI.x11m.ls, "d11")
+series(m.SSI.x11m.tc, "d11")
+series(m.SSI.x11a.ls, "d11")
+series(m.SSI.x11a.tc, "d11")
+
+series(m.SSI.x11m.ls, "d10")
+series(m.SSI.x11m.tc, "d10")
+
+series(m.conc.x11m.ls, "d10")
+series(m.conc.x11m.tc, "d10")
+
+trend cycle 
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+

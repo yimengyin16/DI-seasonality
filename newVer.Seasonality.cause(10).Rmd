@@ -853,7 +853,7 @@ stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,  align = TRUE, 
                     vcov.gg.conc1)
           )
 
-A# unemployment and annual avg temperature
+# unemployment and annual avg temperature
 stargazer(reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  align = TRUE, type = "text",
           title = seaStr.gg_title,
           dep.var.labels= seaStr.gg_depvarNames,
@@ -2376,7 +2376,7 @@ plm_allmon_UIIC.L0.u.tm <-
   plm(UIIC ~ unemply + tempF:month, model = "within", effect = "individual", data = .)
 
 
-plm_allmon_UIIC.L0.umtm <- 
+plm_allmon_UIIC.L0.um.tm <- 
   df_reg_allmon_states %>% 
   filter(!State %in% c("AK", "HI", "DC")) %>% 
   plm(UIIC ~ unemply:month + tempF:month, model = "within", effect = "individual", data = .)
@@ -2797,7 +2797,7 @@ df_reg_pattern <-
            SSI_s3to5  = (SSI_s3  + SSI_s4  + SSI_s5)/3,
            conc_s3to5 = (conc_s3 + conc_s4 + conc_s5)/3,
            
-           unemply_s1to3 = (unemply_s3 + unemply_s4 + unemply_s5)/3,
+           unemply_s1to3 = (unemply_s1 + unemply_s2 + unemply_s3)/3,
            
            
            # SSDI_pattern1 = SSDI_s3 / SSDI_s8,
