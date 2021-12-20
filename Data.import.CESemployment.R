@@ -13,8 +13,8 @@
 #   - Constructing and mining data do not contain DE and HI 
 
 ## Last updated:
-#   - download: 2021-10-16
-#   - data up to: 2021-09
+#   - download: 2021-12-18
+#   - data up to: 2021-11
 
 
 rm(list = ls())
@@ -69,11 +69,11 @@ get_UIdata <- function(key){
 		fredr(
 			series_id = key,
 			observation_start = as.Date("2000-01-01"),
-			observation_end   = as.Date("2021-09-01")
+			observation_end   = as.Date("2021-12-01")
 		)
 }
 
-
+#### Run once for each update ----
 # data_tot_raw <-
 # 	purrr::map_dfr(var_names_tot, get_UIdata, .id = "State") %>%
 # 	mutate(VarName = "emplyMon_tot")
@@ -107,6 +107,7 @@ get_UIdata <- function(key){
 # 		 data_trade_raw,
 # 		 data_gov_raw,
 # 		 file = paste0("Data/employment/", "data_raw_CESemployment.RData"))
+####
 
 load(paste0("Data/employment/", "data_raw_CESemployment.RData"))
 

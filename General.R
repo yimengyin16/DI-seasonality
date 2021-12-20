@@ -63,6 +63,13 @@ library(foreach)
 # detach("package:dplyr", unload=TRUE)
 
 
+## X13 ARIMA SEATS
+#install.packages("seasonal") # also installs the X13 binary
+library(seasonal)
+
+
+
+
 # User defined functions-------------------------------------------------------
 
 

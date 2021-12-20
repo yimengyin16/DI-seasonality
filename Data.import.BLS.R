@@ -16,28 +16,28 @@
 # The output is saved to "emply.RData"
 
 
+source("General.R")
 
 # Import employment statistics from Local Area Unemployment Statistics(LAUS).----------------
 
-# Last run on 10/15/2021
-# Data up to 08/2021
-# Import seasonally unadjusted series at state level
+# Last run on 12/18/2021
+# Data up to 11/2021
+
+## Import seasonally unadjusted series at state level
 # emplyU = read.table("http://download.bls.gov/pub/time.series/la/la.data.2.AllStatesU",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-# # Import seasonally adjusted series at state level
+## Import seasonally adjusted series at state level
 # emplyS = read.table("http://download.bls.gov/pub/time.series/la/la.data.3.AllStatesS",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
 # 
-save(emplyU, emplyS, file = "Data/emplyData.RData")
+# save(emplyU, emplyS, file = "Data/emplyData.RData")
 
 load("Data/emplyData.RData")
 
-
 emply = rbind(emplyU,emplyS)
-
 emply = transform(emply, 
                   adj = substr(series_id,3,3),
-                  State = substr(series_id,6,7),
+                  State = factor(substr(series_id,6,7)),
                   Cal.Year = year,
                   Month = as.integer(substr(period,2,3)),
                   value = as.numeric(value),
@@ -77,20 +77,15 @@ emply$State = as.factor(convertAbbr(emply$State))
 # emply$unemply3 = NA
 
 
-
 # Import national level employment statistics from CPS --------------------
 
 # Last run on 10/16/2021
-# Data up to 9/2021
+# Data up to 11/2021
 # CPSdata = read.table("http://download.bls.gov/pub/time.series/ln/ln.data.1.AllData",
 #                     header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-# 
-##CPSdata = read.table("C:\\Users\\yimen\\Google Drive\\AB_Projects_Personal\\Third_year\\Original Data\\ln.data.1.AllData.txt",
-##                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-# This will take a while to download
-#
-# save(CPSdata, file = "Data/CPSdata.RData")
- 
+#This will take a while to download
+#save(CPSdata, file = "Data/CPSdata.RData")
+
 load("Data/CPSdata.RData")
 
 
@@ -151,11 +146,21 @@ rm(CPSdata)
 # Merge the state level and national level data ---------------------------
 
   #emply = rbind(emply,emplyNW, emplyAG, emplyA8, emplyA9)
+# emply %>% head()
+# emplyNW %>% head
+# 
+# emply1 = bind_rows(emply,emplyNW, emplyAG, emplyA8, emplyA9)
+# 
+# emply1 = melt(emply1, id = c("adj", "State", "Cal.Year","Month"))
+# emply2 = dcast(emply1, State + Cal.Year + Month ~ variable + adj) 
 
-  emply = bind_rows(emply,emplyNW, emplyAG, emplyA8, emplyA9)
 
-  emply = melt(emply, id = c("adj", "State", "Cal.Year","Month"))
-  emply = dcast(emply, State + Cal.Year + Month ~ variable + adj) 
+emply = bind_rows(emply,emplyNW, emplyAG, emplyA8, emplyA9)
+
+emply = melt(emply, id = c("adj", "State", "Cal.Year","Month"))
+emply = dcast(emply, State + Cal.Year + Month ~ variable + adj) 
+
+
 
 # Create seasonal factors for each variables
 # 

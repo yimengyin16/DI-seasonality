@@ -38,16 +38,12 @@
 # top5 = c("NW","CA","TX","FL","NY","PA")
 # top10 = c("CA", "TX", "FL", "NY", "PA", "OH", "MI", "IL", "NC", "GA")
 
-
 source("General.R")
 
 # Importing raw Data ----------------------------------------------------------
 
-
-# all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2014.8.csv"), header = FALSE)
-# all0 <- read.csv(paste0(path_proj, "/Original Data/SSA-SA-MOWL-2019.08.csv"), header = FALSE)
-all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-08.csv", header = FALSE)
-
+# all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-08.csv", header = FALSE)
+all0 <- read.csv("Data/MOWL/SSA-SA-MOWL-2021-11.csv", header = FALSE)
 
 
 # "SSA-SA-MOWL-2021-08.csv" contains no variable names, need to extract variable names from "SSA-SA-MOWL-2014.7.csv"
@@ -57,9 +53,6 @@ rm(NAME)
 
 
 # Date translation table
-# date <- read.csv("Data/MOWL/SSA-DATES1-extended.csv")[,1:14]
-# date <- date[!is.na(date$File.Name), ]
-
 date <- read.csv("Data/MOWL/SSA_DATES1-2021.csv")[,1:14]
 date <- date[!is.na(date$File.Name), ]
 
@@ -380,7 +373,7 @@ all = transform(all, AllowRate.Total      = Allow.Total / Det.Total,
                      AllowRate.Title.16   = Allow.Title.16 / Det.Title.16,
                      AllowRate.Concurrent = Allow.Concurrent / Det.Concurrent)
 
-
+all0
 
 
 save(all0, all, file = "Data/all.RData")

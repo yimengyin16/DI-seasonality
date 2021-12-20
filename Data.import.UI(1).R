@@ -10,7 +10,7 @@
 
 ## Last updated:
 #  - download:   2021-10-16
-#  - data up to: 2021-06-26
+#  - data up to: 2021-12-11
 
 rm(list = ls())
 library(fredr)
@@ -46,10 +46,11 @@ get_UIdata <- function(key){
 		fredr(
 			series_id = key,
 			observation_start = as.Date("2000-01-01"),
-			observation_end = as.Date("2021-07-01")
+			observation_end = as.Date("2021-12-18")
 		)
 }
 
+## run once for each data update
 # data_UI_IC_raw <-
 # 	purrr::map_dfr(var_names_IC, get_UIdata, .id = "state") %>%
 # 	mutate(UItype = "IC")
