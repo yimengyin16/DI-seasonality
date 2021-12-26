@@ -35,6 +35,47 @@ options(xtable.include.rownames = F,
         xtable.caption.placement = "top")
 
 
+get_x13out <- function(m){
+# Extrat outputs series from a X13 output object
+  
+mName <- deparse(substitute(m))
+mType <- str_extract(mName, "x11|SEATS")
+
+if(mType == "x11"){
+m.temp <- series(m, c("d10", "d12", "d13", "d11"))
+dates  <- time(m.temp) %>% as.yearmon
+
+m.temp %<>%
+  as_tibble %>% 
+  mutate(date_yearmon = dates,
+         mName = mName) %>% 
+  rename(seasonal = d10,
+         trend    = d12,
+         error    = d13,
+         seaAdj   = d11) %>% 
+  relocate(mName, date_yearmon)
+}
+
+if(mType == "SEATS"){
+m.temp <- series(m, c("s10", "s12", "s13", "s11"))
+dates  <- time(m.temp) %>% as.yearmon
+
+m.temp %<>%
+  as_tibble %>% 
+  mutate(date_yearmon = dates,
+         mName = mName) %>% 
+  rename(seasonal = s10,
+         trend    = s12,
+         error    = s13,
+         seaAdj   = s11) %>% 
+  relocate(mName, date_yearmon)
+}
+
+invisible(m.temp)
+
+}
+
+
 source("General.R")
 # source("Forecasting.main.R")
 
@@ -778,6 +819,120 @@ as_latex(tbl_change)
 ```
 
 
+
+# 3. Echo effects of COVID-19 
+
+Seasonal adjustment is needed for monitoring and understanding the dynamics of underlying trend
+and cycle of economic variables, which is crucial during periods of large economic changes like the ones
+cauased by the Great Recession and COVID-19. However, abrupt economic changes/crisis poses great challenges for seasonal adjustment. It is difficult to separate seasonal component from other components, namely trend, cycle and irregular: seasonal adjustment procedures may mistakenly assimilate part of the changes in non-seasonal components into seasonals, leading to artifically high or low levels of seasonally adjusted values; seasonal adjustment filters may also fail to identify and pick up the new changes in seasonal patterns, which may be temporary or permenant, and leave them in seasonally adjusted values. Either way, seasonally adjusted values will be distorted. 
+
+With less than two years' data during the COVID-19 pandemic, it is insufficient to separate seasonals and trend/cycle with great confidence. Assumptions, explicit or implicit are needed. What we can do is to evaluate whether the choice of assumptions and methods would affect the answer to important questions.  
+
+We explore two questions:
+
+1. Assuming the COVID-19 pandemic did not change the seasonal pattern of DI applications, who the choice of seasonal adjustment parameters and methods would affect the seasonally adjusted series? Would that impact affect the answer to the question of how the covid and the policy response affected DI applications?
+
+2. How likely the pandemic has changed the seasonal pattern? 
+
+
+
+```{r}
+
+df <- 
+  Panel_all %>% 
+  filter(State == "NW") %>% 
+  select(State, date_yearmon, Formatted.Date, SSDI = Title.2, SSI = Title.16, conc = Concurrent) %>% 
+  mutate(SSDI  = ts(SSDI, start = c(2000,10), frequency = 12),
+         SSI   = ts(SSI, start = c(2000,10),  frequency = 12),
+         Concurrent  = ts(conc, start = c(2000,10), frequency = 12)
+         )
+
+#  Automatic X11
+m.SSDI.x11m.auto = seas(df$SSDI, x11 = "", transform.function = "log", outlier.types = c("ALL"))
+m.SSI.x11m.auto  = seas(df$SSI,  x11 = "", transform.function = "log", outlier.types = c("ALL"))
+m.Concurrent.x11m.auto = seas(df$Concurrent, x11 = "", transform.function = "log", outlier.types = c("ALL"))
+
+
+# 2. x11 multiplicative, multi
+
+# Additive outliers for each month from Mar 2020 to Nov 2021
+ao_covid <- c(paste0("ao2020.", tolower(month.abb)[3:12]), paste0("ao2021.", tolower(month.abb)[1:11]))
+
+spec.x11m.AOcovid <- list(x11 = "",
+                     transform.function = "log", 
+                     outlier.types = c("ALL"),
+                     outlier.span  = "2000.oct, 2020.feb", 
+                     regression.variables = ao_covid)
+
+m.SSDI.x11m.AOcovid = seas(df$SSDI, list = spec.x11m.AOcovid)
+m.SSI.x11m.AOcovid = seas(df$SSI, list = spec.x11m.AOcovid)
+m.Concurrent.x11m.AOcovid = seas(df$Concurrent, list = spec.x11m.AOcovid)
+
+m.SSDI.x11m.AOcovid %>% summary
+m.SSI.x11m.AOcovid %>% summary
+m.Concurrent.x11m.AOcovid %>% summary
+
+df_x13out <- 
+  bind_rows(
+    get_x13out(m.SSDI.x11m.auto),
+    get_x13out(m.SSI.x11m.auto),
+    get_x13out(m.Concurrent.x11m.auto),
+    
+    get_x13out(m.SSDI.x11m.AOcovid),
+    get_x13out(m.SSI.x11m.AOcovid),
+    get_x13out(m.Concurrent.x11m.AOcovid)
+    )
+
+df_x13out %<>% 
+  separate(mName, c("m", "DItype","SAmethod", "olType")) %>% 
+  select(-m) %>% 
+  mutate(original = trend * seasonal * error)
+
+
+df_fig <- 
+df_x13out %>% 
+  filter(date_yearmon >= as.yearmon("2020-03")) %>% 
+  select(DItype, date_yearmon, olType, seaAdj) %>% 
+  spread(olType, seaAdj) %>% 
+  mutate(DItype = factor(DItype, c("SSDI", "SSI", "Concurrent")),
+         seasEcho = auto - AOcovid,
+         seasEcho_pct = auto/AOcovid - 1
+         ) %>% 
+  arrange(DItype)
+
+
+
+covidMon_labels <- c(paste0(month.abb[c(3,5, 7, 9, 11)], " 2020"), paste0(month.abb[c(1, 3, 5, 7, 9, 11)], " 2021"))
+covidMon_dates  <- as_date(c("2020-03-01", "2020-05-01", "2020-07-01", "2020-09-01",
+                             "2020-11-01", "2021-01-01", "2021-03-01", "2021-05-01",
+                             "2021-07-01", "2021-09-01", "2021-11-01")
+                           )
+
+df_fig %>% 
+  mutate(date = as_date(date_yearmon)) %>% 
+  ggplot(aes(x = date, y = seasEcho_pct)) + theme_bw() + 
+  facet_grid(DItype ~.) + 
+  #geom_line() +
+  geom_bar(stat = "identity", width = 14, fill = "dodgerblue3" ) + 
+  geom_hline(yintercept = c(-0.02, 0, 0.02), linetype = 2, color = "gray50") + 
+  coord_cartesian(ylim = c(-0.042, 0.042)) + 
+  scale_x_date(breaks = covidMon_dates,
+               labels = covidMon_labels
+               ) +
+  scale_y_continuous(breaks = seq(-1, 1, 0.02), labels = function(x) percent(x, accuracy = 1) ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(x = NULL,
+       y = "Difference from the the baseline results")
+
+
+
+ 
+ 
+
+
+
+
+```
 
 
 
