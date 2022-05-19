@@ -1,0 +1,54 @@
+---
+title: "Data Description for the SSA Project"
+author: "Yimeng Yin"
+date: "11/6/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Notes on variables included in the shared data file
+
+- **`State`**: Including all states, territories, and non-state agencies in the MOWL dataset. FED for Federal components. EA, EO, EV and EM for extended service teams assisting other states. 
+
+- **`Region`**: 10 SSA regions and FED for federal. Note that the extended service teams are inlcuded in the regions where they are located.
+
+- **`date_yearmon`**: Years and SSA working months in "yearmon" (zoo R package needed) in the RData file (feature lost in the .csv version). 
+
+- **`Formatted.Date`**: Years and SSA working months in text format
+
+- **`Cal.Year`**: Calender year
+
+- **`Month`**: SSA working month
+
+- **`No.week`**: Number of weeks in the SSA working months from SSA  (2011-09 and 2016-09 are changed from 4 to 5. See more details below.)
+
+- **`adj.factor`**: Adjustment factor applied to original MOWL data to make all SSA working months have the same number of weeks (4.35). See more details below. 
+
+- **`Title.2, Title.16, Concurrent`**: Number of SSDI only (Title.2), SSI only (Title16), and concurrent disability applications.  
+
+- **`Det.Title.2, Det.Title.16, Det.Concurrent`**: Number of SSDI only (Title.2), SSI only (Title16), and concurrent disability determinations. 
+				 
+- **`Allow.Title.2, Allow.Title.16, Allow.Concurrent`**: Number of SSDI only (Title.2), SSI only (Title16), and concurrent disability allowances. 
+
+- **`uRate_S, uRate_U`**: Unemployment rates. S: seasonally adjusted, U: not seasonally adjusted. Source: BLS.
+
+- **`unemply_S, unemply_U`**: Number of unemployment. S: seasonally adjusted, U: not seasonally adjusted. Source: BLS.
+
+- **`emply_S, emply_U`**: Number of employment. S: seasonally adjusted, U: not seasonally adjusted. Source: BLS.
+
+- **`labor_S, labor_U`**: Labor force. S: seasonally adjusted, U: not seasonally adjusted.  Source: BLS.
+
+- **`UICC, UIIC_unadj`**: Number of initial claims of unemployment benefits. Monthly values are constructed based on weekly values. Months are SSA working months determined in a manner similar to the MOWL data (see more details below). UIIC: values adjusted for the number weeks in SSA working months (all with 4.35 weeks) using the adj.factor. UIIC_unadj: values not adjusted for the number weeks in SSA wokring months. Use UIIC for modeling purpuses. Source: FRED
+
+- **`jobOpen_s, jobOpenRate_s, jobOpen_u, jobOpenRate_u`**: Job opening and job opening rate. `s`: seasonally adjusted, `u`: not seasonally adjusted. Source: FRED.
+
+- **`emplyMon_construction, emplyMon_gov, emplyMon_leisure, emplyMon_mining, emplyMon_tot, emplyMon_trade`**: Monthly employment for selected industries. (`tot` for total non-farm employment). Source: CES.
+
+
+
+
+

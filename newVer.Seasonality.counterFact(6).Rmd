@@ -790,6 +790,29 @@ fig_echo_x11seats <-
   labs(x = NULL,
        y = "Difference from the the baseline results")
 
+# X11 only
+fig_echo_x11 <- 
+  df_echo %>% 
+  mutate(date = as_date(date_yearmon)) %>% 
+  filter(
+         SAmethod == "X11",
+         olType == "auto") %>% 
+  mutate(SAmethod = factor(SAmethod, c("X11", "SEATS"), 
+                           c("X11 automatic", "SEATS automatic"))) %>% 
+  ggplot(aes(x = date, y = seasEcho_pct)) + theme_bw() + 
+  facet_grid(DItype ~ .) + 
+  #geom_line() +
+  geom_bar(stat = "identity", width = 14, fill = "dodgerblue3" ) + 
+  geom_hline(yintercept = c(-0.02, 0, 0.02), linetype = 2, color = "gray50") + 
+  coord_cartesian(ylim = c(-0.05, 0.05)) + 
+  scale_x_date(breaks = covidMon_dates,
+               labels = covidMon_labels
+               ) +
+  scale_y_continuous(breaks = seq(-1, 1, 0.02), labels = function(x) percent(x, accuracy = 1) ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))+
+  labs(x = NULL,
+       y = "Difference from the the baseline results")
+
 
 
 
@@ -841,12 +864,14 @@ fig_echo_ol.seats <-
   labs(x = NULL,
        y = "Difference from the the baseline results")
 
+fig_echo_x11
 fig_echo_x11seats
 fig_echo_ol.x11
 fig_echo_ol.seats
 
-ggsave(fig_echo_x11seats, filename = paste0(dir.fig_newVer, "fig_echo_x11seats.png"), height = 7, width = 8)
 
+ggsave(fig_echo_x11, filename = paste0(dir.fig_newVer, "fig_echo_x11.png"), height = 7, width = 7, scale = 0.8)
+ggsave(fig_echo_x11seats, filename = paste0(dir.fig_newVer, "fig_echo_x11seats.png"), height = 7, width = 8)
 ggsave(fig_echo_ol.x11, filename = paste0(dir.fig_newVer, "fig_echo_ol.x11.png"), height = 7, width = 9)
 ggsave(fig_echo_ol.seats, filename = paste0(dir.fig_newVer, "fig_echo_ol.seats.png"), height = 7, width = 9)
 
@@ -1250,6 +1275,7 @@ tbl_change
 
 ## Compare seasonals before and after covid
 ```{r}
+## Need to run "Run seasonal adjustments in 2 to get df_x13out"
 
 ## run X13 only using data up to 2020:02
 
@@ -1368,8 +1394,8 @@ df_compareSeas <-
   gather(seasType, seasonal,  -DItype, -SAmethod, -olType, -date_yearmon) %>% 
   mutate(method = paste0(SAmethod,"_", olType),
          seasType = factor(seasType, c("preCovid", "postCovid"),
-                                     c("Based on pre-COVID data\n(2000:10-2020:2)",
-                                       "Based on data including COVID period\n(2000:10-2021:11)"
+                                     c("Pre-COVID seasonal factor of the corresponding month \n(average of the 2 years prior to COVID; based on data up to 2020:2)",
+                                       "Post-COVID seasonal factor\n(based on data including the COVID period)"
                                        )
                            ))
 
@@ -1401,7 +1427,7 @@ fig_compareSeas <-
                labels = c("Mar 2020", "Aug 2020", "Jan 2021", "Mar 2021", "Aug 2021")
                ) + 
   labs(x = NULL,
-       y = "Seasonal factor",
+       y = "Seasonal component",
        color = NULL,
        caption = fig_caption) +
   theme(legend.position = "bottom",
@@ -1641,13 +1667,14 @@ df_fig.impact <-
 
 fig_impact_SSDI <- 
   df_fig.impact %>% 
-  filter(DItype == "SSDI") %>% 
+  filter(DItype == "SSDI",
+         !(current_year == 2021 & mon == "Dec")) %>% 
   ungroup %>%
   ggplot(aes(x = current_year, y = seas_chg, fill = method)) + theme_bw() +
   facet_wrap(mon~., nrow = 2) +
   #geom_line() +
   #geom_point() +
-  geom_bar(stat = "identity", position ="dodge", width = 0.7) + 
+  geom_bar(stat = "identity", position ="dodge", width = 0.8) + 
   coord_cartesian(ylim = c(-0.1, 0.07)) + 
   scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) + 
   geom_hline(yintercept = 0, linetype = 2, color = "grey50")+
@@ -1663,17 +1690,18 @@ fig_impact_SSDI
 # ls and tc are similar
 fig_impact_SSI <- 
   df_fig.impact %>% 
-  filter(DItype == "SSI") %>% 
+  filter(DItype == "SSI",
+         !(current_year == 2021 & mon == "Dec")) %>% 
   ungroup %>%
   ggplot(aes(x = current_year, y = seas_chg, fill = method)) + theme_bw() +
   facet_wrap(mon~., nrow = 2) +
   #geom_line() +
   #geom_point() +
-  geom_bar(stat = "identity", position ="dodge", width = 0.7) +
+  geom_bar(stat = "identity", position ="dodge", width = 0.8) +
   coord_cartesian(ylim = c(-0.1, 0.07)) + 
   scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) + 
-  geom_hline(yintercept = 0, linetype = 2, color = "grey50")+
-  geom_vline(xintercept = 2019.5, linetype = 2, color = "grey50")+
+  geom_hline(yintercept = 0, linetype = 2, color = "grey50", size = 0.4)+
+  geom_vline(xintercept = 2019.5, linetype = 2, color = "grey50", size = 0.4)+
   labs(title = "SSI",
        x = NULL,
        y = "Impact on previous year's seasonal factor",
@@ -1681,15 +1709,18 @@ fig_impact_SSI <-
   theme(legend.position = "bottom")
 # ls and tc are similar
 
+# ggsave(fig_impact_SSI, filename = paste0(dir.fig_newVer, "fig_impact_SSI.png"), height = 6, width = 15, scale = 0.7)
+
 fig_impact_Concurrent <- 
   df_fig.impact %>% 
-  filter(DItype == "Concurrent") %>% 
+  filter(DItype == "Concurrent",
+         !(current_year == 2021 & mon == "Dec")) %>% 
   ungroup %>%
   ggplot(aes(x = current_year, y = seas_chg, fill = method)) + theme_bw() +
   facet_wrap(mon~., nrow = 2) +
   # geom_line() +
   # geom_point() +
-  geom_bar(stat = "identity", position ="dodge", width = 0.7) +
+  geom_bar(stat = "identity", position ="dodge", width = 0.8) +
   coord_cartesian(ylim = c(-0.1, 0.07)) + 
   scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) + 
   geom_hline(yintercept = 0, linetype = 2, color = "grey50")+
