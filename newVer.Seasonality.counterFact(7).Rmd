@@ -736,6 +736,7 @@ df_x13out %<>%
          SAmethod = factor(SAmethod, c("x11m", "SEATSm"), c("X11", "SEATS"))
          )
 
+
 # Save outlier information of the TC AO method for CiSSA
 
 series_NWno.otl <-  
@@ -1430,17 +1431,20 @@ df_compareSeas <-
                                        )
                            ))
 
+# Figures for papers
 
-
-fig_caption <- c("Notes: \n- The original CiSSA seasonal components are additive. For comparison purposes, they are converted to \nmultiplicative seasonal factors (seasonally adjusted values divided by unadjusted values). \n- TC denotes temporary change; AO denots additive outlier.")
 
 method_slc <- 
-  c(X11_tcao = "X11\n(TC in 2020:5; AO in 2021:8)",
-    SEATS_tcao = "SEATS\n(TC in 2020:5; AO in 2021:8)",
+  c(X11_tcao = "X11",  #"X11\n(TC in 2020:5; AO in 2021:8)",
+    SEATS_tcao = "SEATS", #"SEATS\n(TC in 2020:5; AO in 2021:8)",
     CiSSA_none = "CiSSA"
     )
 
-fig_compareSeas <- 
+## Figure with CiSSA
+
+fig_caption <- c("Notes: \n- The original CiSSA seasonal components are additive. For comparison purposes, they are converted to \nmultiplicative seasonal factors (seasonally adjusted values divided by unadjusted values). \n- In all methods, May 2020 is hardcoded as a temporary change and Aug 2021 is hardcoded as a additive outlier.")
+
+fig_compareSeas_CiSSA_L48 <- 
   df_compareSeas %>% 
   mutate(date = as_date(date_yearmon)) %>% 
   #filter(method %in% c("X11_tc", "X11_tcao")) %>% 
@@ -1464,11 +1468,47 @@ fig_compareSeas <-
   theme(legend.position = "bottom",
         plot.caption = element_text(hjust = 0),
         axis.text.x  = element_text(angle = 45, vjust = 1, size = 8, hjust = 1))  
-fig_compareSeas
+fig_compareSeas_CiSSA_L48
 # Assuming level shift would leading greater dampening of seasonality
 
-# ggsave(fig_compareSeas, filename = paste0(dir.fig_newVer, "fig_covid_compareSeas.png"),
-#        width = 10*0.8, height = 10*0.8)
+ggsave(fig_compareSeas_CiSSA_L48, filename = paste0(dir.fig_newVer, "fig_covid_compareSeas_CiSSA_L48.png"),
+       width = 10*0.8, height = 10*0.8)
+
+
+
+## Figure without CiSSA
+
+fig_caption <- c("Notes: - In both methods, May 2020 is hardcoded as a temporary change (TC) and Aug 2021 is hardcoded as a additive outlier (AO).")
+
+fig_compareSeas_noCiSSA <- 
+  df_compareSeas %>% 
+  mutate(date = as_date(date_yearmon)) %>% 
+  filter(method %in% names(method_slc[1:2])) %>% 
+  mutate(method = factor(method, names(method_slc[1:2]), method_slc[1:2])) %>% 
+  ggplot(aes(date, seasonal, color = seasType)) + theme_bw() +
+  facet_grid(DItype ~ method) +
+  geom_line() +
+  geom_point(size = 0.9) +
+  geom_hline(yintercept = 1, color = "gray50", linetype = 2,size = 0.5) +
+  coord_cartesian(ylim = c(0.88, 1.12)) + 
+  scale_color_manual(values = c("grey40", "firebrick2")) + 
+  scale_x_date(breaks = as_date(c("2020-03-01", "2020-08-01","2021-01-01", "2021-03-01", "2021-08-01")),
+               labels = c("Mar 2020", "Aug 2020", "Jan 2021", "Mar 2021", "Aug 2021")
+               ) + 
+  labs(x = NULL,
+       y = "Seasonal component",
+       color = NULL,
+       caption = fig_caption) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(hjust = 0),
+        axis.text.x  = element_text(angle = 45, vjust = 1, size = 8, hjust = 1))  
+fig_compareSeas_noCiSSA
+# Assuming level shift would leading greater dampening of seasonality
+
+ggsave(fig_compareSeas_noCiSSA, filename = paste0(dir.fig_newVer, "fig_covid_compareSeas_noCiSSA.png"),
+       width = 10*0.8, height = 10*0.8)
+
+
 
 
 

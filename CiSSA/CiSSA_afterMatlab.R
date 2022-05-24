@@ -7,13 +7,13 @@ library(ggplot2)
 library(magrittr)
 
 ## loading CiSSA results
-df_rc_SSDI.NW <- read_csv("CiSSA/rc_SSDI_NW.csv", col_names = FALSE)
-df_rc_SSI.NW  <- read_csv("CiSSA/rc_SSI_NW.csv", col_names = FALSE)
-df_rc_conc.NW <- read_csv("CiSSA/rc_conc_NW.csv", col_names = FALSE)
+df_rc_SSDI.NW <- read_csv("CiSSA/DINW_L48/rc_SSDI_NW.csv", col_names = FALSE)
+df_rc_SSI.NW  <- read_csv("CiSSA/DINW_L48/rc_SSI_NW.csv", col_names = FALSE)
+df_rc_conc.NW <- read_csv("CiSSA/DINW_L48/rc_conc_NW.csv", col_names = FALSE)
 
-df_rc_SSDI.NW_pre <- read_csv("CiSSA/rc_SSDI_NW_pre.csv", col_names = FALSE)
-df_rc_SSI.NW_pre  <- read_csv("CiSSA/rc_SSI_NW_pre.csv", col_names = FALSE)
-df_rc_conc.NW_pre <- read_csv("CiSSA/rc_conc_NW_pre.csv", col_names = FALSE)
+df_rc_SSDI.NW_pre <- read_csv("CiSSA/DINW_L48/rc_SSDI_NW_pre.csv", col_names = FALSE)
+df_rc_SSI.NW_pre  <- read_csv("CiSSA/DINW_L48/rc_SSI_NW_pre.csv", col_names = FALSE)
+df_rc_conc.NW_pre <- read_csv("CiSSA/DINW_L48/rc_conc_NW_pre.csv", col_names = FALSE)
 
 
 names(df_rc_SSDI.NW) <- c("SSDI_rc.trend", "SSDI_rc.cycle", "SSDI_rc.seasonal")
