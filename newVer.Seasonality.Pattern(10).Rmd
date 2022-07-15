@@ -219,7 +219,7 @@ ThreeSeries.NW = ggplot(AppSeries, aes(x = Formatted.Date, y = value, colour = v
               geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
               coord_cartesian(ylim = c(0, 130000)) + 
               scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
-              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-12-1"))) + 
+              scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2022-4-1"))) + 
               scale_y_continuous(breaks = seq(0, 200000, 20000), labels = comma) + 
               labs(
                    x = NULL, y = "Number of Applications", colour = NULL)+
@@ -248,7 +248,7 @@ plot_3series <- function(State_slc, df = Panel_all){
                 geom_vline(xintercept = as.numeric(as.Date(paste0(2001:2022, "-1-1"))), linetype = 3, size = 0.5) +            
                 
                 scale_color_manual(values = c("red","blue","orange"), labels = c("SSDI", "SSI", "Concurrent")) + 
-                scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2021-12-1"))) + 
+                scale_x_date(date_breaks = "1 year", labels = date_format("%Y"), limits = as.Date(c("2000-10-1", "2022-4-1"))) + 
                 labs(title = State_slc,
                      x = NULL, y = "Number of Applications", colour = NULL) + 
                 theme(legend.position = "bottom")
@@ -1221,7 +1221,7 @@ ggsave(fig_UIDI_NW, filename = paste0(dir.fig_newVer, "fig_season_UIDI_US+.png")
 
 df_season_avg$.model %>% unique
 
-  fig_jobOpenRate <- 
+fig_jobOpenRate <- 
   df_season_avg %>% 
   filter(State  %in% "US",
         .model %in% c("jobOpenRate")
@@ -1451,9 +1451,9 @@ fit_concurrent <- filter(mod_ets$conc, State == "AG")$conc[[1]]
 
 #%>% fabletools::forecast(h = 14)
 
-fcst_SSDI       <- fabletools::forecast(fit_SSDI, h = 21)
-fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 21)
-fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 21)
+fcst_SSDI       <- fabletools::forecast(fit_SSDI, h = 26)
+fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 26)
+fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 26)
 
 # max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
 
@@ -1537,7 +1537,7 @@ fig_fcast_DI_US <-
 
 
 ggsave(fig_fcast_DI_US, filename = paste0(dir.fig_newVer, "fig_counterFct_US.png"),
-       width = 11*1.1, height = 4.3*1.1)
+       width = 12*1.1, height = 4.3*1.1)
 
 
 

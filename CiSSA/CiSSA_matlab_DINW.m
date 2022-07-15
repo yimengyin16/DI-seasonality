@@ -34,7 +34,7 @@ m_conc_pre = table2array(df_DINW_pre(:, "Concurrent"));
 %  - 1 Mirroring. 
 %  - 2 No extention
 
-L = 48; % Re Poncela's suggestions, use shorter bandwidth to capture changes in seasonality
+L = 24; % Re Poncela's suggestions, use shorter bandwidth to capture changes in seasonality
 H = 0;
 [Z_SSDI, psd_SSDI] = cissa(m_SSDI, L, H);
 [Z_SSI,  psd_SSI]  = cissa(m_SSI, L, H);
@@ -56,21 +56,21 @@ I = 12; % for 12 months in a year
 
 %% write to csv
 
-writematrix(rc_SSDI, "DINW_L48\rc_SSDI_NW.csv");
-writematrix(rc_SSI,  "DINW_L48\rc_SSI_NW.csv");
-writematrix(rc_conc, "DINW_L48\rc_conc_NW.csv");
-
-writematrix(rc_SSDI_pre, "DINW_L48\rc_SSDI_NW_pre.csv");
-writematrix(rc_SSI_pre,  "DINW_L48\rc_SSI_NW_pre.csv");
-writematrix(rc_conc_pre, "DINW_L48\rc_conc_NW_pre.csv");
-
-% writematrix(rc_SSDI, "DINW_L24\rc_SSDI_NW.csv");
-% writematrix(rc_SSI,  "DINW_L24\rc_SSI_NW.csv");
-% writematrix(rc_conc, "DINW_L24\rc_conc_NW.csv");
+% writematrix(rc_SSDI, "DINW_L48\rc_SSDI_NW.csv");
+% writematrix(rc_SSI,  "DINW_L48\rc_SSI_NW.csv");
+% writematrix(rc_conc, "DINW_L48\rc_conc_NW.csv");
 % 
-% writematrix(rc_SSDI_pre, "DINW_L24\rc_SSDI_NW_pre.csv");
-% writematrix(rc_SSI_pre,  "DINW_L24\rc_SSI_NW_pre.csv");
-% writematrix(rc_conc_pre, "DINW_L24\rc_conc_NW_pre.csv");
+% writematrix(rc_SSDI_pre, "DINW_L48\rc_SSDI_NW_pre.csv");
+% writematrix(rc_SSI_pre,  "DINW_L48\rc_SSI_NW_pre.csv");
+% writematrix(rc_conc_pre, "DINW_L48\rc_conc_NW_pre.csv");
+
+writematrix(rc_SSDI, "DINW_L24\rc_SSDI_NW.csv");
+writematrix(rc_SSI,  "DINW_L24\rc_SSI_NW.csv");
+writematrix(rc_conc, "DINW_L24\rc_conc_NW.csv");
+
+writematrix(rc_SSDI_pre, "DINW_L24\rc_SSDI_NW_pre.csv");
+writematrix(rc_SSI_pre,  "DINW_L24\rc_SSI_NW_pre.csv");
+writematrix(rc_conc_pre, "DINW_L24\rc_conc_NW_pre.csv");
 
 
 

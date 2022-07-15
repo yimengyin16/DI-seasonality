@@ -19,8 +19,6 @@
         # Panel: Combine data from "all0" and "all" in "all.RData" and "emply" in "emply.RData",
         #        log, log difference, and lags are generated. 
 
-
-
 source("General.R")
 
 (load("Data/all.RData"))

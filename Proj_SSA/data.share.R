@@ -6,13 +6,14 @@
 
 
 # Output:
-#  - DI-seasonality/Prof_SSA
+#  - DI-seasonality/Proj_SSA
 
 
 ## Tools -----------------------------------------------------------------------
 source("General.R")
 library(tidyverse)
 library(here)
+library(magrittr)
 
 
 
@@ -48,7 +49,6 @@ Panel %<>%
 					 )
 
 Panel$State %>% unique
-
 
 saveRDS(Panel, file = "Proj_SSA/data_MOWL&EconVars.rds")
 

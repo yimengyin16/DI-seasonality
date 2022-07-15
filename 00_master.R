@@ -11,7 +11,7 @@
 # source(Data.download.R)
 
 # Processing MOLW data
-#  - Data.import.MOWL(2).R
+#  - Data.import.MOWL.R
 
 # Loading and processing BLS (employment) data
 #  - Data.import.BLS.R
@@ -21,6 +21,9 @@
 
 # Loading and processing CES data (monthly employment by industry and state)
 #  - Data.import.CESemployment.R
+
+# Loading job opening data
+#  - Data.import.jobOpen.R
 
 # Loading and processing UI data
 #  - Data.import.UI(1).R
@@ -43,7 +46,7 @@ source("Data.outliers(2).R")
 ## Producing results for the paper - new version ----
 # - newVer.Seasonality.Pattern(8).Rmd
 # - newVer.Seasonality.cause(4).Rmd
-# - newVer.Seasonality.counterFact(7).Rmd
+# - newVer.Seasonality.counterFact(8).Rmd
 
 # - newVer.Seasonality.x13.Rmd
 

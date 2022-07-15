@@ -9,8 +9,8 @@
 
 
 ## Last updated:
-#  - download:   2021-10-16
-#  - data up to: 2021-12-11
+#  - download:   2022-05-24
+#  - data up to: 2022-05-14
 
 rm(list = ls())
 library(fredr)
@@ -46,22 +46,22 @@ get_UIdata <- function(key){
 		fredr(
 			series_id = key,
 			observation_start = as.Date("2000-01-01"),
-			observation_end = as.Date("2021-12-18")
+			observation_end = as.Date("2022-12-31")
 		)
 }
 
 ## run once for each data update
-# data_UI_IC_raw <-
-# 	purrr::map_dfr(var_names_IC, get_UIdata, .id = "state") %>%
-# 	mutate(UItype = "IC")
-# 
-# data_UI_CC_raw <-
-# 	purrr::map_dfr(var_names_CC, get_UIdata, .id = "state") %>%
-# 	mutate(UItype = "CC")
-# 
-# save(data_UI_IC_raw,
-# 		 data_UI_CC_raw,
-# 		 file = paste0("Data/UI/", "data_raw_UIclaims.RData"))
+data_UI_IC_raw <-
+	purrr::map_dfr(var_names_IC, get_UIdata, .id = "state") %>%
+	mutate(UItype = "IC")
+
+data_UI_CC_raw <-
+	purrr::map_dfr(var_names_CC, get_UIdata, .id = "state") %>%
+	mutate(UItype = "CC")
+
+save(data_UI_IC_raw,
+		 data_UI_CC_raw,
+		 file = paste0("Data/UI/", "data_raw_UIclaims.RData"))
 
 
 load(paste0("Data/UI/", "data_raw_UIclaims.RData"))

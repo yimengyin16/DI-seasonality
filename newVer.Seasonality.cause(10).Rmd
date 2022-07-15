@@ -211,6 +211,12 @@ In theory, the impact of industrial structure should be already reflected in the
 # ls_ets$df_comp_ets %>% 
 #   filter(.model == "emplyMon_mining")
 
+
+ls_ets$df_comp_ets %>% 
+  as_tibble %>% 
+  filter(!is.na(remainder), !is.na(season)) 
+
+
 # 1. variace based measure
 df_seaStr_var <- 
   ls_ets$df_comp_ets %>% 
@@ -241,6 +247,7 @@ df_seaStr_var <-
          
          
          )
+
 
 
 
@@ -322,8 +329,8 @@ tbl_seaStr_var_US <-
   gt %>% 
   cols_label(
     .model = "",
-    seaStr_var  = "without trend",
-    seaStr_var2 = "with trend"
+    seaStr_var  = "Without trend",
+    seaStr_var2 = "With trend"
   ) %>% 
   tab_spanner(
     label = "Seasonal strength with respect to series",
@@ -334,7 +341,9 @@ tbl_seaStr_var_US <-
   fmt_number(columns = 2:3,
              decimals = 2)
 tbl_seaStr_var_US
-  
+ 
+x <- tbl_seaStr_var_US %>% as_latex() 
+x[[1]] %>% cat()
 
 
 ## Variation of var-based measure across states: bar plot
@@ -342,20 +351,23 @@ tbl_seaStr_var_US
 library(forcats)
 
 # Plot for SSDI
+
+fig_seaStr_barplot <- 
 df_seaStr_var_tbl %>% 
   filter(.model == "SSDI",
          State %in% state.abb) %>% 
   arrange(desc(seaStr_var)) %>% 
   mutate(State = factor(State) %>% fct_inorder) %>% 
   ggplot(aes(x = State, y = seaStr_var)) + theme_bw() + 
-  geom_bar(stat = "identity", fill = "dodgerblue4", width = 0.8) +
+  geom_bar(stat = "identity", fill = "dodgerblue3", width = 0.8) +
   coord_cartesian(ylim = c(0,1)) + 
   scale_y_continuous(breaks = seq(0,1, 0.1)) + 
   labs(
        #title = "Seasonal strength with respect to detrended series, by state, 2000:10-2020:2",
        title = NULL,
        y = "Seasonal strength with respect to detrended series")
-  
+
+ggsave(paste0(dir.fig_newVer, "fig_seaStr_barplot.png"), fig_seaStr_barplot, width = 10, height = 6, scale = 1)
 
 
 
@@ -837,12 +849,12 @@ vcov.gg.conc3 <- sqrt(diag(vcovHC(reg_gg.conc3, method = "HC3")))
 
 
 seaStr.gg_depvarNames <- c("UI initial", "SSID", "SSI", "Concurrent") 
-seaStr.gg_covarNames  <- c("Sea. Strength of unemployment",  "Anuual average temp.") 
-seaStr.gg_covarNames2  <- c("Sea. Strength of unemployment", "Std Dev. of monthly temp.")  
+seaStr.gg_covarNames  <- c("Sea. Strength of \nunemployment",  "Anuual average temp.") 
+seaStr.gg_covarNames2  <- c("Sea. Strength of \nunemployment", "Std Dev. of monthly temp.")  
 seaStr.gg_title <- "Regression results: seasonal amplitude"  
 
-# unemployment only
-stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,  align = TRUE, type = "text",
+# unemployment only (a)
+stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,  align = TRUE, type = "latex",
           title = seaStr.gg_title,
           dep.var.labels= seaStr.gg_depvarNames,
           covariate.labels= seaStr.gg_covarNames[1],
@@ -853,7 +865,20 @@ stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,  align = TRUE, 
                     vcov.gg.conc1)
           )
 
-# unemployment and annual avg temperature
+
+# unemployment and sd of monthly temperature (b)
+stargazer(reg_gg.UIIC3, reg_gg.SSDI3, reg_gg.SSI3, reg_gg.conc3,  align = TRUE, type = "latex",
+          title = seaStr.gg_title,
+          dep.var.labels= seaStr.gg_depvarNames,
+          covariate.labels= seaStr.gg_covarNames2,
+          
+          se = list(vcov.gg.UIIC3,
+                    vcov.gg.SSDI3,
+                    vcov.gg.SSI3,
+                    vcov.gg.conc3)
+          )
+
+# unemployment and annual avg temperature (not in paper)
 stargazer(reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  align = TRUE, type = "text",
           title = seaStr.gg_title,
           dep.var.labels= seaStr.gg_depvarNames,
@@ -866,39 +891,29 @@ stargazer(reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  align = TRUE, 
           
           )
 
-# unemployment and sd of monthly temperature
-stargazer(reg_gg.UIIC3, reg_gg.SSDI3, reg_gg.SSI3, reg_gg.conc3,  align = TRUE, type = "text",
-          title = seaStr.gg_title,
-          dep.var.labels= seaStr.gg_depvarNames,
-          covariate.labels= seaStr.gg_covarNames2,
-          
-          se = list(vcov.gg.UIIC3,
-                    vcov.gg.SSDI3,
-                    vcov.gg.SSI3,
-                    vcov.gg.conc3)
-          )
 
 
 
-stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,
-          reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  
-          align = TRUE, type = "text",
-          title = seaStr.gg_title,
-          dep.var.labels= c(seaStr.gg_depvarNames, seaStr.gg_depvarNames),
-          covariate.labels= seaStr.gg_covarNames,
-          #column.labels = c("a", "b"),
-          #column.separate = c(4, 4),
-          
-           se = list(vcov.gg.UIIC1,
-                    vcov.gg.SSDI1,
-                    vcov.gg.SSI1,
-                    vcov.gg.conc1,
-                    
-                    vcov.gg.UIIC2,
-                    vcov.gg.SSDI2,
-                    vcov.gg.SSI2,
-                    vcov.gg.conc2)
-          )
+# 
+# stargazer(reg_gg.UIIC1, reg_gg.SSDI1, reg_gg.SSI1, reg_gg.conc1,
+#           reg_gg.UIIC2, reg_gg.SSDI2, reg_gg.SSI2, reg_gg.conc2,  
+#           align = TRUE, type = "text",
+#           title = seaStr.gg_title,
+#           dep.var.labels= c(seaStr.gg_depvarNames, seaStr.gg_depvarNames),
+#           covariate.labels= seaStr.gg_covarNames,
+#           #column.labels = c("a", "b"),
+#           #column.separate = c(4, 4),
+#           
+#            se = list(vcov.gg.UIIC1,
+#                     vcov.gg.SSDI1,
+#                     vcov.gg.SSI1,
+#                     vcov.gg.conc1,
+#                     
+#                     vcov.gg.UIIC2,
+#                     vcov.gg.SSDI2,
+#                     vcov.gg.SSI2,
+#                     vcov.gg.conc2)
+#           )
 
 
 # stargazer(reg_gg.UIIC, reg_gg.SSDI, reg_gg.SSI, reg_gg_conc,  align = TRUE,
@@ -2548,10 +2563,14 @@ vcov.SSDI.L2.u     <- sqrt(diag(vcovHC(plm_allmon_SSDI.L2.u, method = "white1"))
 vcov.SSDI.L2.u.tm  <- sqrt(diag(vcovHC(plm_allmon_SSDI.L2.u.tm, method = "white1")))
 vcov.SSDI.L2.um.tm <- sqrt(diag(vcovHC(plm_allmon_SSDI.L2.um.tm, method = "white1")))
 
-stargazer(plm_allmon_SSDI.L1.u,
-          plm_allmon_SSDI.L2.u,
-          plm_allmon_SSDI.L1.u.tm,
-          plm_allmon_SSDI.L2.u.tm,
+
+m1 <- plm_allmon_SSDI.L1.u
+m2 <- plm_allmon_SSDI.L2.u
+m3 <- plm_allmon_SSDI.L1.u.tm
+m4 <- plm_allmon_SSDI.L2.u.tm
+
+
+stargazer(m1, m2, m3, m4,
           #plm_allmon_SSDI.L1.um.tm,
           #plm_allmon_SSDI.L2.um.tm,
           
@@ -2564,11 +2583,10 @@ stargazer(plm_allmon_SSDI.L1.u,
           ),
           
           align = TRUE, type = "text",
-          #title = seaStr.gg_title,
           dep.var.labels = "SSDI only applications",
           covariate.labels= plm_covarNames.DI
+					#title = seaStr.gg_title
           )
-
 
 
 ## SSI table
@@ -2586,12 +2604,15 @@ vcov.SSI.L2.u     <- sqrt(diag(vcovHC(plm_allmon_SSI.L2.u, method = "white1")))
 vcov.SSI.L2.u.tm  <- sqrt(diag(vcovHC(plm_allmon_SSI.L2.u.tm, method = "white1")))
 vcov.SSI.L2.um.tm <- sqrt(diag(vcovHC(plm_allmon_SSI.L2.um.tm, method = "white1")))
 
-stargazer(plm_allmon_SSI.L1.u,
-          plm_allmon_SSI.L2.u,
-          plm_allmon_SSI.L1.u.tm,
-          plm_allmon_SSI.L2.u.tm,
-          #plm_allmon_SSI.L1.um.tm,
-          #plm_allmon_SSI.L2.um.tm,
+
+m1 <- plm_allmon_SSI.L1.u
+m2 <- plm_allmon_SSI.L2.u
+m3 <- plm_allmon_SSI.L1.u.tm
+m4 <- plm_allmon_SSI.L2.u.tm
+
+
+
+stargazer(m1, m2, m3, m4,
           
           se = list(vcov.SSI.L1.u,
                     vcov.SSI.L2.u,
@@ -2601,7 +2622,7 @@ stargazer(plm_allmon_SSI.L1.u,
                     #vcov.SSI.L2.um.tm 
           ),
           
-          align = TRUE, type = "text",
+          align = TRUE, type = "latex",
           #title = seaStr.gg_title,
           dep.var.labels = "SSI only applications",
           covariate.labels= plm_covarNames.DI
@@ -2623,12 +2644,13 @@ vcov.conc.L2.u     <- sqrt(diag(vcovHC(plm_allmon_conc.L2.u, method = "white1"))
 vcov.conc.L2.u.tm  <- sqrt(diag(vcovHC(plm_allmon_conc.L2.u.tm, method = "white1")))
 vcov.conc.L2.um.tm <- sqrt(diag(vcovHC(plm_allmon_conc.L2.um.tm, method = "white1")))
 
-stargazer(plm_allmon_conc.L1.u,
-          plm_allmon_conc.L2.u,
-          plm_allmon_conc.L1.u.tm,
-          plm_allmon_conc.L2.u.tm,
-          #plm_allmon_conc.L1.um.tm,
-          #plm_allmon_conc.L2.um.tm,
+
+m1 <- plm_allmon_conc.L1.u
+m2 <- plm_allmon_conc.L2.u
+m3 <- plm_allmon_conc.L1.u.tm
+m4 <- plm_allmon_conc.L2.u.tm
+
+stargazer(m1, m2, m3, m4,
           
           se = list(vcov.conc.L1.u,
                     vcov.conc.L2.u,
@@ -2638,7 +2660,7 @@ stargazer(plm_allmon_conc.L1.u,
                     #vcov.conc.L2.um.tm 
           ),
           
-          align = TRUE, type = "text",
+          align = TRUE, type = "latex",
           #title = seaStr.gg_title,
           dep.var.labels = "conc only applications",
           covariate.labels= plm_covarNames.DI
@@ -2656,11 +2678,10 @@ vcov.UIIC.L0.um.tm <- sqrt(diag(vcovHC(plm_allmon_UIIC.L0.um.tm, method = "white
 # vcov.UIIC.L1.u.tm  <- sqrt(diag(vcovHC(plm_allmon_UIIC.L1.u.tm, method = "white1")))
 # vcov.UIIC.L1.um.tm <- sqrt(diag(vcovHC(plm_allmon_UIIC.L1.um.tm, method = "white1")))
 
-stargazer(plm_allmon_UIIC.L0.u,
-          #plm_allmon_UIIC.L1.u,
-          plm_allmon_UIIC.L0.u.tm,
-          #plm_allmon_UIIC.L1.u.tm,
-          #plm_allmon_UIIC.L1.um.tm,
+m1 <- plm_allmon_UIIC.L0.u
+m2 <- plm_allmon_UIIC.L0.u.tm
+
+stargazer(m1, m2,
           
           se = list(vcov.UIIC.L0.u,
                     vcov.UIIC.L0.u.tm),
@@ -2675,20 +2696,22 @@ stargazer(plm_allmon_UIIC.L0.u,
 
 
 
-## UI and SSDI table
+## UI and SSDI table (paper)
 
 plm_covarNames.UISSDI <- c("Unemployment",
                           "Unemployment: 1-month lag",
                           "Unemployment: 2-month lag",
-                           paste0("Temperature(F): ", month.abb)
+                           paste0("Temperature: ", month.abb)
                       )
 
-stargazer(plm_allmon_UIIC.L0.u,
-          plm_allmon_UIIC.L0.u.tm,
-          plm_allmon_SSDI.L1.u,
-          plm_allmon_SSDI.L2.u,
-          plm_allmon_SSDI.L1.u.tm,
-          plm_allmon_SSDI.L2.u.tm,
+m1 <- plm_allmon_UIIC.L0.u
+m2 <- plm_allmon_UIIC.L0.u.tm
+m3 <- plm_allmon_SSDI.L1.u
+m4 <- plm_allmon_SSDI.L2.u
+m5 <- plm_allmon_SSDI.L1.u.tm
+m6 <- plm_allmon_SSDI.L2.u.tm
+
+stargazer(m1, m2, m3, m4, m5, m6,
 
           se = list(vcov.UIIC.L0.u,
                     vcov.UIIC.L0.u.tm,
@@ -2697,7 +2720,7 @@ stargazer(plm_allmon_UIIC.L0.u,
                     vcov.SSDI.L1.u.tm,
                     vcov.SSDI.L2.u.tm),
           
-          align = TRUE, type = "text",
+          align = TRUE, type = "latex",
           #title = seaStr.gg_title,
           dep.var.labels = "UI initial claims",
           covariate.labels= plm_covarNames.UISSDI,
@@ -2886,7 +2909,7 @@ fig_peak1_unemp <-
   scale_x_continuous(breaks=seq(-100, 100, 10)) + 
   scale_y_continuous(breaks=seq(0, 3, 0.05)) + 
   labs(title = "Jan-Mar peak of unemployment",
-       x = "Average temperature (F)",
+       x = "Average temperature",
        y = "Average seasonal factor")
 fig_peak1_unemp 
 
@@ -2917,7 +2940,7 @@ fig_peak1_SSDI <-
   scale_y_continuous(breaks=seq(0, 3, 0.05)) + 
   
   labs(title = "Mar-May peak of SSDI only applications",
-       x = "Average temperature (F)",
+       x = "Average temperature",
        y = "Average seasonal factor")
 fig_peak1_SSDI 
 
@@ -2948,7 +2971,7 @@ fig_peak1_UIIC <-
   scale_y_continuous(breaks=seq(0, 3, 0.1)) + 
   labs(
        title = "Dec-Jan peak of UI initial claims",
-       x = "Average temperature (F)",
+       x = "Average temperature",
        y = "Average seasonal factor")
 fig_peak1_UIIC    
 
@@ -2984,7 +3007,7 @@ fig_peak2_unemp <-
   geom_smooth(method='lm') + 
   labs(
        title = "Jul peak of unemployment",
-       x = "Average temperature (F)",
+       x = "Average temperature",
        y = "Average seasonal factor")
 
 fig_peak2_unemp 
@@ -3018,7 +3041,7 @@ fig_peak2_SSDI <-
   scale_y_continuous(breaks=seq(0, 3, 0.05)) + 
   labs(
        title = "Aug peak of SSDI only applications",
-       x = "Average temperature (F)",
+       x = "Average temperature",
        y = "Average seasonal factor")
 fig_peak2_SSDI
 
@@ -3053,7 +3076,7 @@ fig_peak2_UIIC <-
   scale_y_continuous(breaks=seq(0, 3, 0.1)) + 
   labs(
        title = "Jul-Aug peak of UI initial claims",
-       x = "Average temperature (F)",
+       x = "Average temperature",
        y = "Average seasonal factor")
 
 
@@ -3070,9 +3093,24 @@ fig_peaks_UIIC <-
     list(fig_peak1_UIIC, fig_peak2_UIIC), nrow = 1, ncol = 2, top = "UI initial claims")
 
 
+fig_peaks_all <- 
+  marrangeGrob(
+    list(fig_peak1_unemp, fig_peak2_unemp,
+    		 fig_peak1_SSDI, fig_peak2_SSDI,
+    		 fig_peak1_UIIC, fig_peak2_UIIC), 
+    nrow = 3, ncol = 2, top = "Unemployment")
+fig_peaks_all
+
+
 # fig_peaks_unemp
 # fig_peaks_SSDI
 # fig_peaks_UIIC
+
+ggsave(
+  paste0(plot.path, "fig_newVer/fig_peaksTemp_all.png"), 
+  fig_peaks_all,
+  width = 11, height = 11, scale = 1.1
+ )
 
 ggsave(
   paste0(plot.path, "fig_newVer/fig_peaksTemp_unemp.png"), 

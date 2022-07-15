@@ -14,6 +14,9 @@
 # The job openings rate is computed by dividing the number of job openings by the sum of 
 #   employment and job openings and multiplying that quotient by 100.
 
+# Last imported
+#  - 2022-05-25
+
 
 library(fredr)
 library(dplyr)
@@ -44,7 +47,7 @@ get_FREDdata <- function(key){
 		fredr(
 			series_id = key,
 			observation_start = as.Date("2000-01-01"),
-			observation_end = as.Date("2021-09-01")
+			observation_end = as.Date("2022-12-31")
 		)
 }
 

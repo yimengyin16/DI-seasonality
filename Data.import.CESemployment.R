@@ -1,4 +1,4 @@
-# Loading UI initial claims data
+# Loading employment data
 
 # Inputs:
 #  - FRED monthly non-farm employment by industry and state
@@ -13,8 +13,8 @@
 #   - Constructing and mining data do not contain DE and HI 
 
 ## Last updated:
-#   - download: 2021-12-18
-#   - data up to: 2021-11
+#   - download: 2022-05-24
+#   - data up to: 2022-04
 
 
 rm(list = ls())
@@ -69,11 +69,11 @@ get_UIdata <- function(key){
 		fredr(
 			series_id = key,
 			observation_start = as.Date("2000-01-01"),
-			observation_end   = as.Date("2021-12-01")
+			observation_end   = as.Date("2022-12-01")
 		)
 }
 
-#### Run once for each update ----
+#### Run once for each update --------------------------------------------------
 # data_tot_raw <-
 # 	purrr::map_dfr(var_names_tot, get_UIdata, .id = "State") %>%
 # 	mutate(VarName = "emplyMon_tot")
@@ -107,7 +107,7 @@ get_UIdata <- function(key){
 # 		 data_trade_raw,
 # 		 data_gov_raw,
 # 		 file = paste0("Data/employment/", "data_raw_CESemployment.RData"))
-####
+### ----------------------------------------------------------------------------
 
 load(paste0("Data/employment/", "data_raw_CESemployment.RData"))
 
@@ -124,7 +124,7 @@ data_emplyMon <-
 	mutate(year  = year(date),
 				 month = month(date),
 				 # UItype  = str_extract(series_id, "ICLAIMS|CCLAIMS"),
-				 #UI = value
+				 # UI = value
 				 ) %>% 
 	dplyr::select(VarName, State, year, month, value) %>% 
 	spread(VarName, value)

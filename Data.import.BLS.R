@@ -20,13 +20,13 @@ source("General.R")
 
 # Import employment statistics from Local Area Unemployment Statistics(LAUS).----------------
 
-# Last run on 12/18/2021
-# Data up to 11/2021
+# Last run on 5/24/2022
+# Data up to 04/2022
 
-## Import seasonally unadjusted series at state level
+# # Import seasonally unadjusted series at state level
 # emplyU = read.table("http://download.bls.gov/pub/time.series/la/la.data.2.AllStatesU",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
-## Import seasonally adjusted series at state level
+# # Import seasonally adjusted series at state level
 # emplyS = read.table("http://download.bls.gov/pub/time.series/la/la.data.3.AllStatesS",
 #                    header = TRUE, fill = TRUE, stringsAsFactors = FALSE)
 # 

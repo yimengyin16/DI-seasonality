@@ -392,9 +392,9 @@ fit_concurrent <- filter(mod_ets$conc, State == "AG")$conc[[1]]
 
 #%>% fabletools::forecast(h = 14)
 
-fcst_SSDI       <- fabletools::forecast(fit_SSDI, h = 21)
-fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 21)
-fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 21)
+fcst_SSDI       <- fabletools::forecast(fit_SSDI, h = 26)
+fcst_SSI        <- fabletools::forecast(fit_SSI,  h = 26)
+fcst_concurrent <- fabletools::forecast(fit_concurrent, h = 26)
 
 # max_y <- 1.15* max(c(fc.AG.DI$.mean, fc.AG.SSI$.mean, fc.AG.concurrent$.mean))
 
@@ -418,7 +418,7 @@ autoplot(fcst_SSDI,
        x = NULL,
        y = NULL) +
   theme(legend.position = "bottom") +
-  theme(axis.text.x = element_text(size = 8, angle = 90))
+  theme(axis.text.x = element_text(size = 8, angle = 0))
 
 
 
@@ -441,7 +441,7 @@ fig_fcst_SSI <-
        x = NULL,
        y = NULL) +
   theme(legend.position = "bottom") +
-  theme(axis.text.x = element_text(size = 8, angle = 90))
+  theme(axis.text.x = element_text(size = 8, angle = 0))
 
 
 fig_fcst_concurrent <- 
@@ -463,7 +463,7 @@ autoplot(fcst_concurrent,
        x = NULL,
        y = NULL) +
   theme(legend.position = "bottom") +
-  theme(axis.text.x = element_text(size = 8, angle = 90))
+  theme(axis.text.x = element_text(size = 8, angle = 0))
 
 
 fig_fcst_SSDI
@@ -478,7 +478,7 @@ fig_fcast_DI_US <-
 
 
 ggsave(fig_fcast_DI_US, filename = paste0(dir.fig_newVer, "fig_counterFct_US.png"),
-       width = 11*1.1, height = 4.3*1.1)
+       width = 12*1.1, height = 4.3*1.1)
 
 
 ```
@@ -792,10 +792,17 @@ df_echo <-
   arrange(DItype)
 
 
-covidMon_labels <- c(paste0(month.abb[c(3,5, 7, 9, 11)], " 2020"), paste0(month.abb[c(1, 3, 5, 7, 9, 11)], " 2021"))
+covidMon_labels <- c(paste0(month.abb[c(3,5, 7, 9, 11)], " 2020"), 
+										 paste0(month.abb[c(1, 3, 5, 7, 9, 11)], " 2021"),
+										 paste0(month.abb[c(1, 3)], " 2022")
+										 
+										 
+										 )
 covidMon_dates  <- as_date(c("2020-03-01", "2020-05-01", "2020-07-01", "2020-09-01",
                              "2020-11-01", "2021-01-01", "2021-03-01", "2021-05-01",
-                             "2021-07-01", "2021-09-01", "2021-11-01")
+                             "2021-07-01", "2021-09-01", "2021-11-01",
+														 "2022-01-01", "2022-03-01"
+														 )
                            )
 
 # X11 and seats 
@@ -1540,7 +1547,7 @@ ggsave(fig_compareSeas_noCiSSA, filename = paste0(dir.fig_newVer, "fig_covid_com
 
 ## Measuring impact on seasonal changes
 ```{r}
-
+df_x13
 
 get_SAimpact <- function(DItype, SAmethod, olType, start_year, df = df_x13){ 
 
@@ -1637,9 +1644,9 @@ m.out <-
 
 df %<>% mutate(year = year(date_yearmon)) 
 
-pb <- progress_bar$new(total = length(start_year:2021))
+pb <- progress_bar$new(total = length(start_year:2022))
 
-df_allyears <- map_dfr(start_year:2021, function(x) doSA(x, df))
+df_allyears <- map_dfr(start_year:2022, function(x) doSA(x, df))
 
 df_allyears %<>% 
   mutate(year = year(date_yearmon),
@@ -1811,6 +1818,11 @@ ggsave(fig_impact_SSDI, filename = paste0(dir.fig_newVer, "fig_impact_SSDI.png")
 ggsave(fig_impact_SSI, filename = paste0(dir.fig_newVer, "fig_impact_SSI.png"), height = 6, width = 15, scale = 0.7)
 
 ggsave(fig_impact_Concurrent, filename = paste0(dir.fig_newVer, "fig_impact_Concurrent.png"), height = 6, width = 15, scale = 0.7)
+
+
+# Need to reconcile the reconcile the results: 
+# Why don't see large positive impacts in Nov, Dec and Jan, which are observed in the preliminary comparison figures? 
+
 
 
 ```
